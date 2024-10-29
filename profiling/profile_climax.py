@@ -3,7 +3,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
-import time
+from src.profile_tools import profile_with_torch
 
 # 1. Environment checks
 print(torch.__file__)
@@ -45,6 +45,9 @@ inputs = (x, None, lead_times, variables, out_variables, None, None)
 with torch.no_grad():
     output = model(*inputs)
 print(f"Output shape: {output.shape}")
+
+# 6. Profile model
+profile_with_torch(model, inputs, "climax_global_inference", dump_snapshot=True)
 
 
 # --------------------------------------------------------------------------
