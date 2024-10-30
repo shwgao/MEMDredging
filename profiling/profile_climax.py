@@ -3,7 +3,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
-from src.profile_tools import profile_with_torch
+from profiling.profile_tools import dump_snapshot, profile_with_torch
 
 # 1. Environment checks
 print(torch.__file__)
@@ -47,7 +47,9 @@ with torch.no_grad():
 print(f"Output shape: {output.shape}")
 
 # 6. Profile model
-profile_with_torch(model, inputs, "climax_global_inference", dump_snapshot=True)
+# profile_with_torch(model, inputs, "climax_global_inference", dump_snapshot=True)
+# dump_snapshot(model, inputs, "climax_global_inference")
+# dump_onnx_graph(model, inputs, "climax_global_inference")
 
 
 # --------------------------------------------------------------------------
