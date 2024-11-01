@@ -10,7 +10,7 @@ class ModelWrapper(torch.nn.Module):
         return self.model(*x)
 
 
-def profile_with_torch(model, input, save_name, dump_snapshot=True, wait=1, warmup=1, active=3):
+def profile_with_torch(model, input, save_name, wait=1, warmup=1, active=3):
     with torch.no_grad():
         with torch.profiler.profile(
                 activities=[
