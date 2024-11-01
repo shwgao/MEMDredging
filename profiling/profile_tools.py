@@ -35,8 +35,8 @@ def profile_with_torch(model, input, save_name, wait=1, warmup=1, active=3):
 def dump_snapshot(model, input, save_name):
     with torch.no_grad():
         # clear memory
-        results = model(*input)
-        print(f"Results shape: {results.shape}")
+        # results = model(*input)
+        # print(f"Results shape: {results.shape}")
         
         torch.cuda.empty_cache()
         torch.cuda.memory._record_memory_history()
