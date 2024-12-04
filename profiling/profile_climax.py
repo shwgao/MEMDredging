@@ -47,7 +47,7 @@ with torch.no_grad():
 print(f"Output shape: {output.shape}")
 
 # 6. Profile model
-# profile_with_torch(model, inputs, "climax_global_inference")
+profile_with_torch(model, inputs, "climax_global_inference")
 # dump_snapshot(model, inputs, "climax_global_inference")
 # dump_onnx_graph(model, inputs, "climax_global_inference")
 

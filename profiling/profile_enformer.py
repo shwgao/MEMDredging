@@ -17,8 +17,13 @@ with torch.no_grad():
     output = model(*inputs)
 print(f"Output shape: {output.shape}")
 
+# traced_model = torch.fx.symbolic_trace(model)
+traced_model = torch.fx.TracedModule(model)
+model = torch.fx.GraphModule(model, traced_model.graph)
+print(model.code)
+
 # # 6. Profile model
 # profile_with_torch(model, inputs, "enformer_inference")
-dump_snapshot(model, inputs, "enformer_inference")
+# dump_snapshot(model, inputs, "enformer_inference")
 # dump_onnx_graph(model, inputs, "enformer_inference")
 

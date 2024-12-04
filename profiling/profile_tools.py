@@ -1,5 +1,6 @@
 import torch
 import time
+
 class ModelWrapper(torch.nn.Module):
     def __init__(self, model):
         super().__init__()
@@ -59,7 +60,7 @@ def dump_onnx_graph(model, input, save_name):
 
 if __name__ == "__main__":
     # saving 20GB memory but not using it
-    saving_memory = 12
+    saving_memory = 10
     # Each float32 element takes 4 bytes
     bytes_per_element = 4  # float32
     target_bytes = saving_memory * 1024 * 1024 * 1024  # 20GB in bytes
