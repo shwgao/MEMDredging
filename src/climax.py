@@ -162,8 +162,8 @@ class ClimaX(nn.Module):
         x = torch.einsum("bvld->blvd", x)
         x = x.flatten(0, 1)  # BxL, V, D
         
-        print(f"x.device: {x.device}")
-        print(f"self.var_query.device: {self.var_query.device}")
+        # print(f"x.device: {x.device}")
+        # print(f"self.var_query.device: {self.var_query.device}")
         var_query = self.var_query.repeat_interleave(x.shape[0], dim=0)
         
         x, _ = self.var_agg(var_query, x, x)  # BxL, D # pass need_weights=False to save computation x = self.var_agg(var_query, x, x, need_weights=False)  # BxL, D
@@ -195,7 +195,7 @@ class ClimaX(nn.Module):
         x = x + var_embed.unsqueeze(2)  # B, V, L, D
         # x += var_embed.unsqueeze(2)  # B, V, L, D
         
-        print(f"Memory usage of x: {x.element_size() * x.nelement() / 1024**2} MB")
+        # print(f"Memory usage of x: {x.element_size() * x.nelement() / 1024**2} MB")
         # print(f"Allocated memory of x: {torch.cuda.memory_allocated(x.device) / 1024**2} MB")
 
         # variable aggregation

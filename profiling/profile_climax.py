@@ -3,9 +3,10 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
-from profiling.profile_tools import dump_snapshot, profile_with_torch
+from profile_tools import dump_snapshot, profile_with_torch
+from model_opt.apis import optimize
 
-# 1. Environment checks
+
 print(torch.__file__)
 print(torch.__version__)
 print(torch.version.cuda)
@@ -13,7 +14,6 @@ print(f"Cuda available: {torch.cuda.is_available()}")
 
 from src.climax import ModelConfigGlobal, ClimaX
 
-# 2. Model setup
 model_config = ModelConfigGlobal()
 model = ClimaX(
     default_vars=model_config.default_vars,
@@ -28,28 +28,41 @@ model = ClimaX(
     drop_rate=model_config.drop_rate,
 )
 
-# 3. Device setup and model transfer
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
 model.eval()
 
-# 4. Input preparation
 batch = 40
 x = torch.randn(batch, 48, 32, 64, dtype=torch.float32).to(device)
 lead_times = torch.tensor([72]*batch, dtype=torch.float32).to(device)
 variables = model_config.default_vars
 out_variables = model_config.out_variables
 
-# 5. Model inference
 inputs = (x, None, lead_times, variables, out_variables, None, None)
 with torch.no_grad():
     output = model(*inputs)
 print(f"Output shape: {output.shape}")
 
-# 6. Profile model
-profile_with_torch(model, inputs, "climax_global_inference")
-# dump_snapshot(model, inputs, "climax_global_inference")
-# dump_onnx_graph(model, inputs, "climax_global_inference")
+
+# Profile model before optimization
+if False:
+    torch.cuda.empty_cache()
+    print(f"Allocated memory: {torch.cuda.memory_allocated()/1024**3} GB")
+    profile_with_torch(model, inputs, f"climax_before_opt_bz{batch}")
+    dump_snapshot(model, inputs, f"climax_before_opt_bz{batch}")
+
+if False:
+    # Optimize model
+    model_opt = optimize(model, inputs, node_reordering=False)
+
+    # Profile model after optimization
+    torch.cuda.empty_cache()
+    print(f"Allocated memory: {torch.cuda.memory_allocated()/1024**3} GB")
+    profile_with_torch(model_opt, inputs, f"climax_after_opt_bz{batch}_no_reorder_no_optim")
+    dump_snapshot(model_opt, inputs, f"climax_after_opt_bz{batch}_no_reorder_no_optim")
+
+    result = model_opt(inputs)
+    print(result.shape)
 
 
 # --------------------------------------------------------------------------

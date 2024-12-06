@@ -33,13 +33,13 @@ class Enformer(nn.Module):
 
         # create stem
 
-        # self.stem = nn.Sequential(
-        #     nn.Conv1d(4, half_dim, 15, padding = 7),
-        #     Residual(ConvBlock(half_dim)),
-        #     AttentionPool(half_dim, pool_size = 2)
-        # )
+        self.stem = nn.Sequential(
+            nn.Conv1d(4, half_dim, 15, padding = 7),
+            Residual(ConvBlock(half_dim)),
+            AttentionPool(half_dim, pool_size = 2)
+        )
         
-        self.stem = Stem(half_dim, pool_size = 2)
+        # self.stem = Stem(half_dim, pool_size = 2)
         
         # create conv tower
 
@@ -208,7 +208,7 @@ class AttentionPool(nn.Module):
             self.to_attn_logits.weight.mul_(2)
 
     def forward(self, x):  
-        print(f"Memory consumption inside attention pool: {torch.cuda.memory_allocated() / 1024 / 1024} MB")      
+        # print(f"Memory consumption inside attention pool: {torch.cuda.memory_allocated() / 1024 / 1024} MB")      
         b, _, n = x.shape
         remainder = n % self.pool_size
         needs_padding = remainder > 0
@@ -218,41 +218,41 @@ class AttentionPool(nn.Module):
             mask = torch.zeros((b, 1, n), dtype = torch.bool, device = x.device)
             mask = F.pad(mask, (0, remainder), value = True)
         
-        print(f"Memory consumption after padding: {x.element_size() * x.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
+            # print(f"Memory consumption after padding: {x.element_size() * x.nelement() / 1024 / 1024} MB")
+            # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
+            # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
 
         x = self.pool_fn(x)
         
-        print(f"Memory consumption after pool: {x.element_size() * x.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
+        # print(f"Memory consumption after pool: {x.element_size() * x.nelement() / 1024 / 1024} MB")
+        # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
+        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
         
         logits = self.to_attn_logits(x)
         
-        print(f"Memory consumption after logits: {logits.element_size() * logits.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
+        # print(f"Memory consumption after logits: {logits.element_size() * logits.nelement() / 1024 / 1024} MB")
+        # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
+        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
         
         if needs_padding:
             mask_value = -torch.finfo(logits.dtype).max
             logits = logits.masked_fill(self.pool_fn(mask), mask_value)
         
-        print(f"Memory consumption after masked fill: {logits.element_size() * logits.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
+        # print(f"Memory consumption after masked fill: {logits.element_size() * logits.nelement() / 1024 / 1024} MB")
+        # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
+        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
 
         attn = logits.softmax(dim = -1)
 
-        print(f"Memory consumption after softmax: {attn.element_size() * attn.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
+        # print(f"Memory consumption after softmax: {attn.element_size() * attn.nelement() / 1024 / 1024} MB")
+        # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
+        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
         
         out = (x * attn).sum(dim = -1)
 
-        print(f"Memory consumption after sum: {out.element_size() * out.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
+        # print(f"Memory consumption after sum: {out.element_size() * out.nelement() / 1024 / 1024} MB")
+        # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
+        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
 
         return out
 

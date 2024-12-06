@@ -29,8 +29,7 @@ def profile_with_torch(model, input, save_name, wait=1, warmup=1, active=3):
                     p.step()
                     if i >=5:
                         break
-                    
-                    results = model(*input)
+                    results = model(input)
 
 
 def dump_snapshot(model, input, save_name):
