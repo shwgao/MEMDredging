@@ -4,7 +4,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
 from src.enformer import Enformer
-from profiling.profile_tools import profile_with_torch, dump_snapshot, dump_onnx_graph
+from profiling.profile_tools import profile_with_torch, dump_snapshot, dump_onnx_graph, compute_throughput
+from model_opt.apis import optimize
+from DaYu.asyncPipelineModel import AsyncPipelineModel
 
 model = Enformer()
 model.to('cuda')
@@ -13,18 +15,19 @@ model.eval()
 batch = 8
 
 seq = torch.randint(0, 5, (batch, 196_608)).to('cuda')
-inputs = (seq,)
+inputs = seq
 
 with torch.no_grad():
-    output = model(*inputs)
+    output = model(inputs)
 print(f"Output shape: {output.shape}")
 
 # Profile model before optimization
-if True:
+if False:
     torch.cuda.empty_cache()
     print(f"Allocated memory before running: {torch.cuda.memory_allocated()/1024**3} GB")
-    profile_with_torch(model, inputs, f"enformer_before_opt_bz{batch}")
-    dump_snapshot(model, inputs, f"enformer_before_opt_bz{batch}")
+    # profile_with_torch(model, inputs, f"enformer_before_opt_bz{batch}")
+    # dump_snapshot(model, inputs, f"enformer_before_opt_bz{batch}")
+    compute_throughput(model, inputs, 12*1024**3, mode='eager')
 
 # Profile model after optimization
 if False:
@@ -39,4 +42,15 @@ if False:
 
     result = model_opt(inputs)
     print(result.shape)
+
+# profile model with multistream
+if True:
+    degree = 4
+    model = AsyncPipelineModel(model, degree)
+    
+    torch.cuda.empty_cache()
+    print(f"Allocated memory: {torch.cuda.memory_allocated()/1024**3} GB")
+    # profile_with_torch(model, inputs, f"enformer_after_MS_bz{batch}_degree{degree}")
+    # dump_snapshot(model, inputs, f"enformer_after_MS_bz{batch}_degree{degree}")
+    compute_throughput(model, inputs, 12*1024**3, mode='multistream')
 

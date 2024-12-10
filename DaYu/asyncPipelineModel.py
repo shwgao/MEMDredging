@@ -37,11 +37,18 @@ class AsyncPipelineModel(nn.Module):
                 yield output      
         
 
+    # def forward(self, x):
+    #     sliced_params = self._slice_input(x)
+    #     print(sliced_params)
+    #     for i in range(self.degree):
+    #         with torch.cuda.stream(self.streams[i]):
+    #             output = self.model(x[i])
+    #             yield output
+    
     def forward(self, x):
         sliced_params = self._slice_input(x)
         print(sliced_params)
-        for i in range(self.degree):
-            with torch.cuda.stream(self.streams[i]):
-                output = self.model(x[i])
-                yield output
+        for i, result in enumerate(self._forward(sliced_params)):
+            print(result.shape)
+        return result
         

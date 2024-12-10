@@ -3,7 +3,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
-from profile_tools import dump_snapshot, profile_with_torch
+from profile_tools import dump_snapshot, profile_with_torch, compute_throughput
 from model_opt.apis import optimize
 
 
@@ -45,11 +45,12 @@ print(f"Output shape: {output.shape}")
 
 
 # Profile model before optimization
-if False:
+if True:
     torch.cuda.empty_cache()
     print(f"Allocated memory: {torch.cuda.memory_allocated()/1024**3} GB")
-    profile_with_torch(model, inputs, f"climax_before_opt_bz{batch}")
-    dump_snapshot(model, inputs, f"climax_before_opt_bz{batch}")
+    # profile_with_torch(model, inputs, f"climax_before_opt_bz{batch}")
+    # dump_snapshot(model, inputs, f"climax_before_opt_bz{batch}")
+    compute_throughput(model, inputs, 12*1024**3, mode='eager')
 
 if False:
     # Optimize model

@@ -223,7 +223,9 @@ class ClimaX(nn.Module):
 
         return x
 
-    def forward(self, x, y, lead_times, variables, out_variables, metric, lat):
+    # def forward(self, x, y, lead_times, variables, out_variables, metric, lat):
+    # for simplicity, we remove the irrelevant arguments
+    def forward(self, x, lead_times, variables):
         """Forward pass through the model.
 
         Args:
@@ -288,3 +290,30 @@ class ModelConfigGlobal:
         self.drop_path = drop_path
         self.drop_rate = drop_rate
 
+
+def get_model_and_data(batch_size=1):
+    # return model and dataset
+    model_config = ModelConfigGlobal()
+    model = ClimaX(
+        default_vars=model_config.default_vars,
+        img_size=model_config.img_size,
+        patch_size=model_config.patch_size,
+        embed_dim=model_config.embed_dim,
+        depth=model_config.depth,
+        decoder_depth=model_config.decoder_depth,
+        num_heads=model_config.num_heads,
+        mlp_ratio=model_config.mlp_ratio,
+        drop_path=model_config.drop_path,
+        drop_rate=model_config.drop_rate,
+    )
+
+    # create example data
+    x = torch.randn(batch_size, 48, 32, 64, dtype=torch.float32)
+    lead_times = torch.tensor([72]*batch_size, dtype=torch.float32)
+    variables = model_config.default_vars
+    out_variables = model_config.out_variables
+    # inputs = (x, None, lead_times, variables, out_variables, None, None)
+    inputs = (x, lead_times, variables)
+    batch_index = [0]
+    is_batched = True
+    return model, inputs, batch_index, is_batched

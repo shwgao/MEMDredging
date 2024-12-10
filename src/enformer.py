@@ -90,8 +90,8 @@ class Enformer(nn.Module):
         x = rearrange(x, 'b n d -> b d n')
         x = self.stem(x)
         x = self.conv_tower(x)
-        print(f"Memory useage of x after conv_tower: {x.element_size() * x.nelement() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
+        # print(f"Memory useage of x after conv_tower: {x.element_size() * x.nelement() / 1024 / 1024} MB")
+        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
         x = rearrange(x, 'b d n -> b n d')
         # x = checkpoint_sequential(self.transformer, len(self.transformer), x)
         # x = self.crop_final(x)
@@ -109,7 +109,7 @@ class Enformer(nn.Module):
 
         elif type(x) == torch.Tensor and x.dtype == torch.long:
             x = seq_indices_to_one_hot(x)
-        x.to(self.device)
+        # x.to(self.device)
 
         no_batch = x.ndim == 2
 
