@@ -54,53 +54,87 @@ class ModelProfiler:
             cpu_model(cpu_input)
             torch.onnx.export(cpu_model, cpu_input, f"{self.save_dir}/{save_name}/{save_name}.onnx")
 
-    def compute_throughput(self, data_loader, batch_size, mode='eager'):
+    def compute_throughput(self, data_loader, batch_size, mode='eager', warmup=2, iter=5):
         if mode == 'eager':
-            return self._compute_eager_throughput(data_loader, batch_size)
+            return self._compute_eager_throughput(data_loader, batch_size, warmup, iter)
         elif mode == 'multistream':
-            return self._compute_multistream_throughput(data_loader)
+            return self._compute_multistream_throughput(data_loader, batch_size, warmup, iter)
         else:
             raise ValueError(f"Unknown mode: {mode}")
 
-    def _compute_eager_throughput(self, data_loader, batch_size):
+    def _compute_eager_throughput(self, data_loader, batch_size, warmup=1, iter=5):
         time_list = []
-        for _ in range(5):
-            if isinstance(data_loader, DataLoader):
-                # TODO: compute the troughput with communication time
-                start_time = time.time()
+        memory_list = []
+        # Create CUDA events for timing
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+        
+        if isinstance(data_loader, DataLoader):
+            for _ in range(iter):
+                torch.cuda.synchronize()
+                start_event.record()
+                
                 for batch in data_loader:
                     input_data = batch[0]
                     self.model(*input_data)
-            else:
-                start_time = time.time()
+                memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
+                end_event.record()
+                torch.cuda.synchronize()
+                time_list.append(start_event.elapsed_time(end_event) / 1000.0)
+            batch_size = sum([len(batch[0]) for batch in data_loader])
+        else:
+            for _ in range(warmup):
+                    self.model(*data_loader)
+                    
+            for _ in range(iter):
+                torch.cuda.synchronize()
+                start_event.record()
+                
                 self.model(*data_loader)
-            time_list.append(time.time() - start_time)
+                memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
+                end_event.record()
+                torch.cuda.synchronize()
+                time_list.append(start_event.elapsed_time(end_event) / 1000.0)
 
-        return self._calculate_statistics(time_list, len(data_loader)*batch_size)
+        return self._calculate_statistics(time_list, batch_size, memory_list)
 
-    def _compute_multistream_throughput(self, input_data):
+    def _compute_multistream_throughput(self, input_data, batch_size, warmup=2, iter=5):
         time_list = []
-        for test_iter in range(10):
-            start_time = time.time()
+        memory_list = []
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+        for test_iter in range(iter):
+            for _ in range(warmup):
+                self.model(input_data) # 
+            
+            torch.cuda.synchronize()
+            start_event.record()
+            
             self.model(input_data)
-            time_list.append(time.time() - start_time)
+            memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
+            
+            end_event.record()
+            torch.cuda.synchronize()
+            time_list.append(start_event.elapsed_time(end_event) / 1000.0)
 
-        return self._calculate_statistics(time_list, len(input_data))
+        return self._calculate_statistics(time_list, batch_size, memory_list)
 
-    def _calculate_statistics(self, time_list, num_samples):
+    def _calculate_statistics(self, time_list, num_samples, memory_list):
         time_array = np.array(time_list)
         mean_time = np.mean(time_array)
         std_time = np.std(time_array)
+        mean_memory = np.mean(memory_list)
+        std_memory = np.std(memory_list)
         throughput = num_samples / mean_time
 
-        print(f"Mean time: {mean_time:.4f} seconds")
-        print(f"Memory usage: {torch.cuda.memory_allocated() / 1024**3} GB")
-        print(f"Standard deviation: {std_time:.4f} seconds")
-        print(f"Throughput: {throughput:.2f} samples/second")
+        print(f"Mean time:          {mean_time:.3f}         seconds")
+        print(f"Time  Std:          {std_time:.3f}         seconds")
+        print(f"Memory usage:       {mean_memory:.4g}          GB")
+        print(f"Memory std:         {std_memory:.4g}             GB")
+        print(f"Throughput:         {throughput:.4g}         samples/second")
 
         return {
-            'mean_time': mean_time,
-            'std_time': std_time,
+            'memory': mean_memory,
             'throughput': throughput
         }
 
