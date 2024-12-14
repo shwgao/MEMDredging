@@ -11,14 +11,14 @@ class AsyncPipelineModel(nn.Module):
     
     def _slice_input(self, params):
         if type(params) == torch.Tensor:
-            return torch.chunk(params, self.stream_num, 0)
+            return torch.tensor_split(params, self.stream_num, 0)
         elif type(params) == tuple or type(params) == list:
             processed_params = []
             for param in params:
                 if param is None:
                     processed_params.append(param)
                 elif isinstance(param, torch.Tensor):
-                    processed_params.append(torch.chunk(param, self.stream_num, 0))
+                    processed_params.append(torch.tensor_split(param, self.stream_num, 0))
                 else:
                     # raise ValueError("The type is not supported now.")
                     processed_params.append([param for _ in range(self.stream_num)])

@@ -11,7 +11,7 @@ class ModelProfiler:
         self.device = device
         self.model.to(self.device)
         self.is_training = is_training
-        
+    
     @property
     def wrapped_model(self):
         if self._wrapped_model is None:
@@ -83,18 +83,23 @@ class ModelProfiler:
                 time_list.append(start_event.elapsed_time(end_event) / 1000.0)
             batch_size = sum([len(batch[0]) for batch in data_loader])
         else:
-            for _ in range(warmup):
-                    self.model(*data_loader)
-                    
+            
             for _ in range(iter):
+                for _ in range(warmup):
+                    self.model(*data_loader)
+                
                 torch.cuda.synchronize()
+                # start = time.time()
                 start_event.record()
                 
                 self.model(*data_loader)
                 memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
-                end_event.record()
+                
                 torch.cuda.synchronize()
+                end_event.record()
                 time_list.append(start_event.elapsed_time(end_event) / 1000.0)
+                # end = time.time()
+                # print(f"Time: {end - start:.3f} seconds")
 
         return self._calculate_statistics(time_list, batch_size, memory_list)
 
@@ -103,19 +108,24 @@ class ModelProfiler:
         memory_list = []
         start_event = torch.cuda.Event(enable_timing=True)
         end_event = torch.cuda.Event(enable_timing=True)
-        for test_iter in range(iter):
+        for _ in range(iter):
             for _ in range(warmup):
                 self.model(input_data) # 
             
             torch.cuda.synchronize()
+            # start = time.time()
             start_event.record()
+            start_event.synchronize()
             
             self.model(input_data)
             memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
             
-            end_event.record()
             torch.cuda.synchronize()
+            end_event.record()
+            end_event.synchronize()
             time_list.append(start_event.elapsed_time(end_event) / 1000.0)
+            # end = time.time()
+            # print(f"Time: {end - start:.3f} seconds")
 
         return self._calculate_statistics(time_list, batch_size, memory_list)
 

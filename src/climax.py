@@ -291,9 +291,10 @@ class ModelConfigGlobal:
         self.drop_rate = drop_rate
 
 
-def get_model_and_data(batch_size=1):
-    # return model and dataset
-    model_config = ModelConfigGlobal()
+model_config = ModelConfigGlobal()
+
+def get_model():
+    # return model
     model = ClimaX(
         default_vars=model_config.default_vars,
         img_size=model_config.img_size,
@@ -306,14 +307,16 @@ def get_model_and_data(batch_size=1):
         drop_path=model_config.drop_path,
         drop_rate=model_config.drop_rate,
     )
+    return model
 
+def get_inputs(batch_size):
     # create example data
     x = torch.randn(batch_size, 48, 32, 64, dtype=torch.float32)
     lead_times = torch.tensor([72]*batch_size, dtype=torch.float32)
     variables = model_config.default_vars
-    out_variables = model_config.out_variables
+    # out_variables = model_config.out_variables
     # inputs = (x, None, lead_times, variables, out_variables, None, None)
     inputs = (x, lead_times, variables)
     batch_index = [0]
     is_batched = True
-    return model, inputs, batch_index, is_batched
+    return inputs, batch_index, is_batched
