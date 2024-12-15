@@ -81,6 +81,7 @@ def plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes):
     plt.tight_layout()
     plt.savefig("./logs/batch_profile.png")
 
+
 def plot_data_separate(table, stream_nums, batch_sizes, title=""):
     fig, ax1 = plt.subplots(figsize=(12, 6))
     plt.subplots_adjust(right=0.85)
@@ -111,6 +112,51 @@ def plot_data_separate(table, stream_nums, batch_sizes, title=""):
     plt.grid()
     plt.tight_layout()
     plt.savefig(f"./logs/{title}.png")
+
+
+def log_results(results):
+    # category by batch_size and add {stream_num: (memory, throughput)}
+    batch_size_results = {}
+    stream_nums = []
+    for result in results:
+        batch_size = result["batch_size"]
+        if batch_size not in batch_size_results:
+            batch_size_results[batch_size] = {}
+        stream_num = result["stream_num"]
+        if stream_num not in batch_size_results[batch_size]:
+            batch_size_results[batch_size][stream_num] = (result["memory"], result["throughput"])
+        if stream_num not in stream_nums:
+            stream_nums.append(stream_num)
+    
+    # log the results using table format but in txt file
+    # write memory table first, using stream_num as row, batch_size as column
+    batch_sizes = sorted(batch_size_results.keys())
+    with open("./logs/batch_profile.txt", "w") as f:
+        f.write("Memory Table\n")
+        f.write("Stream Num\\Batch Size | " + " | ".join(map(str, batch_sizes)) + "\n")
+        for stream_num in stream_nums:
+            f.write(
+                f"{stream_num} | " + 
+                " | ".join(
+                    f"{batch_size_results[batch_size][stream_num][0]:.3f}" 
+                    if stream_num in batch_size_results[batch_size] and batch_size_results[batch_size][stream_num] 
+                    else "None"
+                    for batch_size in batch_sizes
+                ) + "\n"
+            )
+
+        f.write("\nThroughput Table\n")
+        f.write("Stream Num\\Batch Size | " + " | ".join(map(str, batch_sizes)) + "\n")
+        for stream_num in stream_nums:
+            f.write(
+                f"{stream_num} | " + 
+                " | ".join(
+                    f"{batch_size_results[batch_size][stream_num][1]:.3f}" 
+                    if stream_num in batch_size_results[batch_size] and batch_size_results[batch_size][stream_num] 
+                    else "None"
+                    for batch_size in batch_sizes
+                ) + "\n"
+            )   
 
 
 if __name__ == "__main__":

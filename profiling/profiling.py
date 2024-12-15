@@ -6,6 +6,7 @@ import argparse
 from typing import Iterable
 from profile_tools import ModelProfiler, DataLoaderGenerator
 from DaYu.asyncPipelineModel import AsyncPipelineModel
+from utils import log_results
 import torch
 from pprint import pprint
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -91,50 +92,6 @@ def batch_profile(args):
     pprint(results)
     return results
 
-
-def log_results(results):
-    # category by batch_size and add {stream_num: (memory, throughput)}
-    batch_size_results = {}
-    stream_nums = []
-    for result in results:
-        batch_size = result["batch_size"]
-        if batch_size not in batch_size_results:
-            batch_size_results[batch_size] = {}
-        stream_num = result["stream_num"]
-        if stream_num not in batch_size_results[batch_size]:
-            batch_size_results[batch_size][stream_num] = (result["memory"], result["throughput"])
-        if stream_num not in stream_nums:
-            stream_nums.append(stream_num)
-    
-    # log the results using table format but in txt file
-    # write memory table first, using stream_num as row, batch_size as column
-    batch_sizes = sorted(batch_size_results.keys())
-    with open("./logs/batch_profile.txt", "w") as f:
-        f.write("Memory Table\n")
-        f.write("Stream Num\\Batch Size | " + " | ".join(map(str, batch_sizes)) + "\n")
-        for stream_num in stream_nums:
-            f.write(
-                f"{stream_num} | " + 
-                " | ".join(
-                    f"{batch_size_results[batch_size][stream_num][0]:.3f}" 
-                    if stream_num in batch_size_results[batch_size] and batch_size_results[batch_size][stream_num] 
-                    else "None"
-                    for batch_size in batch_sizes
-                ) + "\n"
-            )
-
-        f.write("\nThroughput Table\n")
-        f.write("Stream Num\\Batch Size | " + " | ".join(map(str, batch_sizes)) + "\n")
-        for stream_num in stream_nums:
-            f.write(
-                f"{stream_num} | " + 
-                " | ".join(
-                    f"{batch_size_results[batch_size][stream_num][1]:.3f}" 
-                    if stream_num in batch_size_results[batch_size] and batch_size_results[batch_size][stream_num] 
-                    else "None"
-                    for batch_size in batch_sizes
-                ) + "\n"
-            )   
 
 if __name__ == "__main__":
     if args.batch_profile:
