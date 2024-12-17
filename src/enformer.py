@@ -445,36 +445,29 @@ class Stem(nn.Module):
         self.attention_pool = AttentionPool(dim, pool_size = pool_size)
     
     def forward(self, x):
-        print("inside stem")
-        print(f"Memory consumption of x: {x.element_size() * x.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
         x = self.conv(x)
-        print(f"Memory consumption after conv: {x.element_size() * x.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
         x1 = self.conv_block_batchnorm_klass(x)
-        print(f"Memory consumption after batchnorm: {x1.element_size() * x1.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
         x1 = self.conv_block_gelu(x1)
-        print(f"Memory consumption after gelu: {x1.element_size() * x1.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
+        x1 = self.conv_block_gelu(x1)
         x1 = self.conv_block_conv(x1)
-        print(f"Memory consumption after conv: {x1.element_size() * x1.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
+        x1 = self.conv_block_conv(x1)
         # x = x + x1
         x += x1
-        print(f"Memory consumption after addition: {x.element_size() * x.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
         x = self.attention_pool(x)
-        print(f"Memory consumption after attention pool: {x.element_size() * x.nelement() / 1024 / 1024} MB")
-        print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
         return x
+
+
+def get_model():
+    return Enformer()
+
+
+def get_inputs(batch_size):
+    # create batched example data
+    inputs = torch.randint(0, 5, (batch_size, 196_608)).to('cuda')
+    batch_index = [0]
+    is_batched = True
+    return inputs, batch_index, is_batched
+
 
 if __name__ == "__main__":
     model = Enformer()

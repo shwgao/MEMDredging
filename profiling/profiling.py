@@ -13,6 +13,41 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 print(torch.cuda.is_available())
 
 
+def batch_profile(args):
+    batch_sizes = [1, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+    # batch_sizes = [1, 8, 16, 32]
+    stream_nums = [1, 2, 4, 8, 16, 32, 64, 96, 108]
+    # batch_sizes = [16]
+    # stream_nums = [10]
+    
+    results = []
+    for batch_size in batch_sizes:
+        args.batch_size = batch_size
+        for stream_num in stream_nums:
+            print(f"--------------------batch_size: {batch_size}, stream_num: {stream_num}--------------------")
+            if stream_num > batch_size:
+                continue
+            try:
+                args.stream_num = stream_num
+                result = single_profile(args, model)
+                result["batch_size"] = batch_size
+                result["stream_num"] = stream_num
+                results.append(result)
+            except Exception as e:
+                print(f"Error: {e}: batch_size={batch_size}, stream_num={stream_num}")
+                continue
+            
+            # clear cuda cache
+            torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
+            torch.cuda.synchronize()
+            print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**3:.4g} GB")
+            
+    pprint(results)
+    return results
+
+
+
 # args initialization
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="climax", help="")
@@ -57,40 +92,6 @@ def single_profile(args, model):
         profiler.model = async_model
 
     return profiler.compute_throughput(data_loader, batch_size=args.batch_size, mode=args.mode)
-
-
-def batch_profile(args):
-    batch_sizes = [1, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
-    # batch_sizes = [1, 8, 16, 32]
-    stream_nums = [1, 2, 4, 8, 16, 32, 64, 96, 108]
-    # batch_sizes = [16]
-    # stream_nums = [10]
-    
-    results = []
-    for batch_size in batch_sizes:
-        args.batch_size = batch_size
-        for stream_num in stream_nums:
-            print(f"--------------------batch_size: {batch_size}, stream_num: {stream_num}--------------------")
-            if stream_num > batch_size:
-                continue
-            try:
-                args.stream_num = stream_num
-                result = single_profile(args, model)
-                result["batch_size"] = batch_size
-                result["stream_num"] = stream_num
-                results.append(result)
-            except Exception as e:
-                print(f"Error: {e}: batch_size={batch_size}, stream_num={stream_num}")
-                continue
-            
-            # clear cuda cache
-            torch.cuda.empty_cache()
-            torch.cuda.reset_peak_memory_stats()
-            torch.cuda.synchronize()
-            print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**3:.4g} GB")
-            
-    pprint(results)
-    return results
 
 
 if __name__ == "__main__":
