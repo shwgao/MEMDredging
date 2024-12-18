@@ -41,7 +41,7 @@ def read_from_file(file_path):
         return memory_table, throughput_table, batch_size, stream_nums
 
 
-def plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes):
+def plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, save_name=""):
     fig, ax1 = plt.subplots(figsize=(12, 6))
     plt.subplots_adjust(right=0.85)
     # color_table = ["red", "blue", "green", "yellow", "purple", "orange", "pink", "gray", "brown", "black"]
@@ -79,10 +79,10 @@ def plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes):
     plt.title("Throughput and Memory vs Stream Number")
     plt.grid()
     plt.tight_layout()
-    plt.savefig("./logs/batch_profile.png")
+    plt.savefig(f"./logs/batch_profile-{save_name}.png")
 
 
-def plot_data_separate(table, stream_nums, batch_sizes, title=""):
+def plot_data_separate(table, stream_nums, batch_sizes, title="", save_name=""):
     fig, ax1 = plt.subplots(figsize=(12, 6))
     plt.subplots_adjust(right=0.85)
     # color_table = ["red", "blue", "green", "yellow", "purple", "orange", "pink", "gray", "brown", "black"]
@@ -111,7 +111,7 @@ def plot_data_separate(table, stream_nums, batch_sizes, title=""):
     plt.title(f"{title} vs Stream Number")
     plt.grid()
     plt.tight_layout()
-    plt.savefig(f"./logs/{title}.png")
+    plt.savefig(f"./logs/{title}-{save_name}.png")
 
 
 def log_results(results):
@@ -162,7 +162,7 @@ def log_results(results):
 if __name__ == "__main__":
     # Plot the data
     memory_table, throughput_table, batch_sizes, stream_nums = read_from_file("./logs/batch_profile.txt")
-    # plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes)
-    plot_data_separate(memory_table, stream_nums, batch_sizes, "Memory")
-    plot_data_separate(throughput_table, stream_nums, batch_sizes, "Throughput")
+    # plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, save_name="enformer")
+    plot_data_separate(memory_table, stream_nums, batch_sizes, "Memory", save_name="enformer")
+    plot_data_separate(throughput_table, stream_nums, batch_sizes, "Throughput", save_name="enformer")
 

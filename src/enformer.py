@@ -463,7 +463,7 @@ def get_model():
 
 def get_inputs(batch_size):
     # create batched example data
-    inputs = torch.randint(0, 5, (batch_size, 196_608)).to('cuda')
+    inputs = (torch.randint(0, 5, (batch_size, 196_608)),)
     batch_index = [0]
     is_batched = True
     return inputs, batch_index, is_batched
@@ -471,7 +471,7 @@ def get_inputs(batch_size):
 
 if __name__ == "__main__":
     model = Enformer()
-    seq = torch.randint(0, 5, (8, 196_608)).to('cuda') # for ACGTN, in that order (-1 for padding)
+    seq = (torch.randint(0, 5, (8, 196_608)).to('cuda'),) # for ACGTN, in that order (-1 for padding)
 
     step = 0
     model.to('cuda')

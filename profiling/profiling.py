@@ -13,10 +13,34 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 print(torch.cuda.is_available())
 
 
+def single_profile(args, model):    
+    inputs, batch_index, is_batched = get_inputs(args.batch_size)
+    
+    # profiler
+    profiler = ModelProfiler(model, device=args.device, is_training=args.is_training)
+
+    # TODO: we have to add communication time for comprehensive comparison
+    if args.communication_time:
+        dlg = DataLoaderGenerator(inputs, args.batch_size, args.batch_num, batch_index, is_batched=is_batched)
+        data_loader = dlg.get_dataloader()
+    else:
+        data_loader = [i.to(args.device) if hasattr(i, "to") else i for i in inputs]
+
+    # multistream mode
+    if args.mode == "multistream":
+        async_model = AsyncPipelineModel(model, stream_num=args.stream_num)
+        async_model.sliced_input = async_model._slice_input(data_loader)  # in multistream mode, inputs will be saved in the model.sliced_input
+        profiler.model = async_model
+
+    return profiler.compute_throughput(data_loader, batch_size=args.batch_size, mode=args.mode)
+
+
 def batch_profile(args):
-    batch_sizes = [1, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+    # batch_sizes = [1, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+    batch_sizes = [1, 2, 4, 6, 8, 12, 16]
     # batch_sizes = [1, 8, 16, 32]
-    stream_nums = [1, 2, 4, 8, 16, 32, 64, 96, 108]
+    # stream_nums = [1, 2, 4, 8, 16, 32, 64, 96, 108]
+    stream_nums = [1, 2, 4, 8, 16]
     # batch_sizes = [16]
     # stream_nums = [10]
     
@@ -47,13 +71,12 @@ def batch_profile(args):
     return results
 
 
-
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="climax", help="")
+parser.add_argument("--model", type=str, default="enformer", help="")
 parser.add_argument("--mode", type=str, default="multistream", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=4)
-parser.add_argument("--batch_size", type=int, default=32)
+parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
@@ -71,27 +94,6 @@ else:
     raise ValueError(f"Model {args.model} not supported")
 
 model = get_model()
-
-def single_profile(args, model):    
-    inputs, batch_index, is_batched = get_inputs(args.batch_size)
-    
-    # profiler
-    profiler = ModelProfiler(model, device=args.device, is_training=args.is_training)
-
-    # TODO: we have to add communication time for comprehensive comparison
-    if args.communication_time:
-        dlg = DataLoaderGenerator(inputs, args.batch_size, args.batch_num, batch_index, is_batched=is_batched)
-        data_loader = dlg.get_dataloader()
-    else:
-        data_loader = [i.to(args.device) if hasattr(i, "to") else i for i in inputs]
-
-    # multistream mode
-    if args.mode == "multistream":
-        async_model = AsyncPipelineModel(model, stream_num=args.stream_num)
-        async_model.sliced_input = async_model._slice_input(data_loader)  # in multistream mode, inputs will be saved in the model.sliced_input
-        profiler.model = async_model
-
-    return profiler.compute_throughput(data_loader, batch_size=args.batch_size, mode=args.mode)
 
 
 if __name__ == "__main__":
