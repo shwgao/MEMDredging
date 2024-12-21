@@ -702,3 +702,22 @@ class Climate_encoder_free_uncertain_monthly(nn.Module):
             s_final = s_final[0:len(s_final):6]
 
         return mean,std,s_final[0:len(s_final):6]
+
+
+def get_model():
+    past_sample = torch.rand(8, 10, 32, 64).cuda()
+    const_channels_info = torch.rand(1, 2, 32, 64).cuda()
+    lat_map = torch.rand(32, 64).cuda()
+    lon_map = torch.rand(32, 64).cuda()
+    model = Climate_encoder_free_uncertain(5,2,out_types=5,method="euler",use_att=True,use_err=True,use_pos=False)
+    model.update_param([past_sample,const_channels_info,lat_map,lon_map])
+    return model
+
+def get_inputs(batch_size):
+    data = torch.rand(batch_size, 8, 5, 32, 64)
+    data = data[0].view(8,1,5,32,64)
+    time_steps = torch.arange(2, batch_size+2).flatten()
+    batch_index = [0]
+    is_batched = True
+    inputs = (time_steps, data)
+    return inputs, batch_index, is_batched

@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import time
 import torch
 import torch.nn.functional as F
@@ -12,8 +12,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 number_year = 3
 batch_size = 8
 
-data = torch.rand(number_year, batch_size, 5, 32, 64).to(device)
-past_sample = torch.rand(batch_size, 10, 32, 64).to(device)
+data = torch.rand(number_year, 8, 5, 32, 64).to(device)
+past_sample = torch.rand(8, 10, 32, 64).to(device)
 const_channels_info = torch.rand(batch_size, 2, 32, 64).to(device)
 lat_map = torch.rand(32, 64).to(device)
 lon_map = torch.rand(32, 64).to(device)

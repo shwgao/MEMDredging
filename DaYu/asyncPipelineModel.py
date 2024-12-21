@@ -9,15 +9,15 @@ class AsyncPipelineModel(nn.Module):
         self.streams = [torch.cuda.Stream() for _ in range(self.stream_num)]
         self.sliced_input = sliced_input
     
-    def _slice_input(self, params):
+    def _slice_input(self, params, batch_index):
         if type(params) == torch.Tensor:
             return torch.tensor_split(params, self.stream_num, 0)
         elif type(params) == tuple or type(params) == list:
             processed_params = []
-            for param in params:
+            for i, param in enumerate(params):
                 if param is None:
                     processed_params.append(param)
-                elif isinstance(param, torch.Tensor):
+                elif isinstance(param, torch.Tensor) and i in batch_index:
                     processed_params.append(torch.tensor_split(param, self.stream_num, 0))
                 else:
                     # raise ValueError("The type is not supported now.")

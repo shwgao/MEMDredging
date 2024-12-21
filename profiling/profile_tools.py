@@ -1,8 +1,9 @@
 import torch
 import time
 import numpy as np
+import os
 from torch.utils.data import DataLoader
-
+from DaYu.asyncPipelineModel import AsyncPipelineModel
 class ModelProfiler:
     def __init__(self, model=None, save_dir='./logs', device='cuda', is_training=False):
         self.model = model
@@ -14,8 +15,10 @@ class ModelProfiler:
     
     @property
     def wrapped_model(self):
-        if self._wrapped_model is None:
+        if self._wrapped_model is None and not isinstance(self.model, AsyncPipelineModel):
             self._wrapped_model = ModelWrapper(self.model)
+        elif isinstance(self.model, AsyncPipelineModel):
+            self._wrapped_model = self.model
         return self._wrapped_model
 
     def profile_with_torch(self, input_data, save_name, wait=1, warmup=1, active=3):
@@ -30,7 +33,7 @@ class ModelProfiler:
                     profile_memory=True,
                     with_stack=True,
                     with_modules=True,
-                    on_trace_ready=torch.profiler.tensorboard_trace_handler(f'{self.save_dir}/{save_name}'),
+                    on_trace_ready=torch.profiler.tensorboard_trace_handler(f'{self.save_dir}/{save_name}-{time.strftime("%Y-%m-%d-%H-%M-%S")}'),
                 ) as p:
                     for i in range(10):
                         p.step()
@@ -39,11 +42,13 @@ class ModelProfiler:
                         self.model(input_data)
 
     def dump_snapshot(self, input_data, save_name):
+        if not os.path.exists(f"{self.save_dir}/{save_name}"):
+            os.makedirs(f"{self.save_dir}/{save_name}")
         with torch.no_grad():
             torch.cuda.empty_cache()
             torch.cuda.memory._record_memory_history()
-            self.model(input_data)
-            torch.cuda.memory._dump_snapshot(f"{self.save_dir}/{save_name}/{save_name}.pickle")
+            self.wrapped_model(input_data)
+            torch.cuda.memory._dump_snapshot(f"{self.save_dir}/{save_name}/{save_name}-{time.strftime('%Y-%m-%d-%H-%M-%S')}.pickle")
 
     def dump_onnx_graph(self, input_data, save_name):
         # move everything to cpu avoiding different devices issues
@@ -77,29 +82,32 @@ class ModelProfiler:
                 for batch in data_loader:
                     input_data = batch[0]
                     self.model(*input_data)
-                memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
+                    
                 end_event.record()
+                memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
                 torch.cuda.synchronize()
                 time_list.append(start_event.elapsed_time(end_event) / 1000.0)
             batch_size = sum([len(batch[0]) for batch in data_loader])
         else:
-            
-            for _ in range(iter):
+            with torch.no_grad():
                 for _ in range(warmup):
                     self.model(*data_loader)
-                
-                torch.cuda.synchronize()
-                # start = time.time()
-                start_event.record()
-                
-                self.model(*data_loader)
-                memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
-                
-                torch.cuda.synchronize()
-                end_event.record()
-                time_list.append(start_event.elapsed_time(end_event) / 1000.0)
-                # end = time.time()
-                # print(f"Time: {end - start:.3f} seconds")
+                    
+                for _ in range(iter):
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                    # start = time.time()
+                    start_event.record()
+                    
+                    self.model(*data_loader)
+                    end_event.record()
+                    
+                    # print(f"memory: {torch.cuda.max_memory_allocated() / 1024**3}")    
+                    memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
+                    torch.cuda.synchronize()
+                    time_list.append(start_event.elapsed_time(end_event) / 1000.0)
+                    # end = time.time()
+                    # print(f"Time: {end - start:.3f} seconds")
 
         return self._calculate_statistics(time_list, batch_size, memory_list)
 
@@ -108,24 +116,27 @@ class ModelProfiler:
         memory_list = []
         start_event = torch.cuda.Event(enable_timing=True)
         end_event = torch.cuda.Event(enable_timing=True)
-        for _ in range(iter):
+        
+        with torch.no_grad():
             for _ in range(warmup):
-                self.model(input_data) # 
-            
-            torch.cuda.synchronize()
-            # start = time.time()
-            start_event.record()
-            start_event.synchronize()
-            
-            self.model(input_data)
-            memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
-            
-            torch.cuda.synchronize()
-            end_event.record()
-            end_event.synchronize()
-            time_list.append(start_event.elapsed_time(end_event) / 1000.0)
-            # end = time.time()
-            # print(f"Time: {end - start:.3f} seconds")
+                self.model(input_data)
+                
+            for _ in range(iter):
+                
+                torch.cuda.synchronize()
+                # start = time.time()
+                start_event.record()
+                start_event.synchronize()
+                
+                self.model(input_data)
+                memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
+                
+                torch.cuda.synchronize()
+                end_event.record()
+                end_event.synchronize()
+                time_list.append(start_event.elapsed_time(end_event) / 1000.0)
+                # end = time.time()
+                # print(f"Time: {end - start:.3f} seconds")
 
         return self._calculate_statistics(time_list, batch_size, memory_list)
 

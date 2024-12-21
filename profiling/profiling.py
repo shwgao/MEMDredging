@@ -29,18 +29,26 @@ def single_profile(args, model):
     # multistream mode
     if args.mode == "multistream":
         async_model = AsyncPipelineModel(model, stream_num=args.stream_num)
-        async_model.sliced_input = async_model._slice_input(data_loader)  # in multistream mode, inputs will be saved in the model.sliced_input
+        async_model.sliced_input = async_model._slice_input(data_loader, batch_index)  # in multistream mode, inputs will be saved in the model.sliced_input
         profiler.model = async_model
+    else:
+        data_loader = tuple(data_loader)
+
+    if args.dump_snapshot:
+        profiler.dump_snapshot(data_loader, args.model)
+    
+    if args.torch_profiling:
+        profiler.torch_profiling(data_loader, args.model)
 
     return profiler.compute_throughput(data_loader, batch_size=args.batch_size, mode=args.mode)
 
 
-def batch_profile(args):
-    # batch_sizes = [1, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
-    batch_sizes = [1, 2, 4, 6, 8, 12, 16]
+def batch_profile(args, model):
+    batch_sizes = [1, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+    batch_sizes = [1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32]#, 40, 48, 64, 80, 108, 128]
     # batch_sizes = [1, 8, 16, 32]
-    # stream_nums = [1, 2, 4, 8, 16, 32, 64, 96, 108]
-    stream_nums = [1, 2, 4, 8, 16]
+    stream_nums = [1, 2, 4, 8, 16, 32, 64, 96, 108]
+    stream_nums = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32] # ,64]
     # batch_sizes = [16]
     # stream_nums = [10]
     
@@ -73,7 +81,7 @@ def batch_profile(args):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="enformer", help="")
+parser.add_argument("--model", type=str, default="climode", help="")
 parser.add_argument("--mode", type=str, default="multistream", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=4)
 parser.add_argument("--batch_size", type=int, default=8)
@@ -82,6 +90,8 @@ parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument("--is_training", type=bool, default=False)
 parser.add_argument("--batch_profile", type=bool, default=True)
+parser.add_argument("--dump_snapshot", type=bool, default=False)
+parser.add_argument("--torch_profiling", type=bool, default=False)
 
 args = parser.parse_args()
 
@@ -90,17 +100,19 @@ if args.model == "climax":
     from src.climax import get_model, get_inputs
 elif args.model == "enformer":
     from src.enformer import get_model, get_inputs
+elif args.model == "climode":
+    from src.climode import get_model, get_inputs
 else:
     raise ValueError(f"Model {args.model} not supported")
-
-model = get_model()
 
 
 if __name__ == "__main__":
     if args.batch_profile:
-        results = batch_profile(args)
-        log_results(results)
+        model = get_model()
+        # model = torch.compile(model)
+        results = batch_profile(args, model)
+        log_results(results, args.model)
     else:
+        model = get_model()
+        model = torch.compile(model)
         single_profile(args, model)
-    
-    log_results(results)

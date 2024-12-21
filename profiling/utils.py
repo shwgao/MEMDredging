@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 from pprint import pprint
 
 def read_from_file(file_path):
@@ -86,7 +87,9 @@ def plot_data_separate(table, stream_nums, batch_sizes, title="", save_name=""):
     fig, ax1 = plt.subplots(figsize=(12, 6))
     plt.subplots_adjust(right=0.85)
     # color_table = ["red", "blue", "green", "yellow", "purple", "orange", "pink", "gray", "brown", "black"]
-    color_table = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    color_table = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', 
+                   '#bcbd22', '#17becf', '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#9467bd', '#8c564b', 
+                   '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
 
     # Prepare data for plotting
     x = np.arange(len(stream_nums))
@@ -114,7 +117,7 @@ def plot_data_separate(table, stream_nums, batch_sizes, title="", save_name=""):
     plt.savefig(f"./logs/{title}-{save_name}.png")
 
 
-def log_results(results):
+def log_results(results, save_name):
     # category by batch_size and add {stream_num: (memory, throughput)}
     batch_size_results = {}
     stream_nums = []
@@ -131,7 +134,7 @@ def log_results(results):
     # log the results using table format but in txt file
     # write memory table first, using stream_num as row, batch_size as column
     batch_sizes = sorted(batch_size_results.keys())
-    with open("./logs/batch_profile.txt", "w") as f:
+    with open(f"./logs/{save_name}-{time.strftime('%Y-%m-%d-%H-%M-%S')}.txt", "w") as f:
         f.write("Memory Table\n")
         f.write("Stream Num\\Batch Size | " + " | ".join(map(str, batch_sizes)) + "\n")
         for stream_num in stream_nums:
@@ -161,8 +164,8 @@ def log_results(results):
 
 if __name__ == "__main__":
     # Plot the data
-    memory_table, throughput_table, batch_sizes, stream_nums = read_from_file("./logs/batch_profile.txt")
+    memory_table, throughput_table, batch_sizes, stream_nums = read_from_file("./logs/climode-2024-12-20-17-28-26.txt")
     # plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, save_name="enformer")
-    plot_data_separate(memory_table, stream_nums, batch_sizes, "Memory", save_name="enformer")
-    plot_data_separate(throughput_table, stream_nums, batch_sizes, "Throughput", save_name="enformer")
+    plot_data_separate(memory_table, stream_nums, batch_sizes, "Memory", save_name="climode")
+    plot_data_separate(throughput_table, stream_nums, batch_sizes, "Throughput", save_name="climode")
 

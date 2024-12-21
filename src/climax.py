@@ -166,7 +166,7 @@ class ClimaX(nn.Module):
         # print(f"self.var_query.device: {self.var_query.device}")
         var_query = self.var_query.repeat_interleave(x.shape[0], dim=0)
         
-        x, _ = self.var_agg(var_query, x, x)  # BxL, D # pass need_weights=False to save computation x = self.var_agg(var_query, x, x, need_weights=False)  # BxL, D
+        x, _ = self.var_agg(var_query, x, x, need_weights=False)  # BxL, D # pass need_weights=False to save computation x = self.var_agg(var_query, x, x, need_weights=False)  # BxL, D
         
         x = x.squeeze()
 
