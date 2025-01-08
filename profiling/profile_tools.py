@@ -21,7 +21,7 @@ class ModelProfiler:
             self._wrapped_model = self.model
         return self._wrapped_model
 
-    def profile_with_torch(self, input_data, save_name, wait=1, warmup=1, active=3):
+    def torch_profiling(self, input_data, save_name, wait=1, warmup=1, active=3):
         with torch.no_grad():
             with torch.profiler.profile(
                     activities=[
@@ -37,9 +37,9 @@ class ModelProfiler:
                 ) as p:
                     for i in range(10):
                         p.step()
-                        if i >= 5:
+                        if i >= wait + warmup + active:
                             break
-                        self.model(input_data)
+                        self.model(*input_data)
 
     def dump_snapshot(self, input_data, save_name):
         if not os.path.exists(f"{self.save_dir}/{save_name}"):

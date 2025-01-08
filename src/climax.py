@@ -317,6 +317,6 @@ def get_inputs(batch_size):
     # out_variables = model_config.out_variables
     # inputs = (x, None, lead_times, variables, out_variables, None, None)
     inputs = (x, lead_times, variables)
-    batch_index = [0]
+    batch_index = [0, 1]
     is_batched = True
     return inputs, batch_index, is_batched

@@ -29,14 +29,15 @@ def single_profile(args, model):
     # multistream mode
     if args.mode == "multistream":
         async_model = AsyncPipelineModel(model, stream_num=args.stream_num)
-        async_model.sliced_input = async_model._slice_input(data_loader, batch_index)  # in multistream mode, inputs will be saved in the model.sliced_input
+        # in multistream mode, inputs will be saved in the model.sliced_input
+        async_model.sliced_input = async_model._slice_input(data_loader, batch_index)  
         profiler.model = async_model
     else:
         data_loader = tuple(data_loader)
 
     if args.dump_snapshot:
         profiler.dump_snapshot(data_loader, args.model)
-    
+
     if args.torch_profiling:
         profiler.torch_profiling(data_loader, args.model)
 
@@ -81,15 +82,15 @@ def batch_profile(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="climode", help="")
+parser.add_argument("--model", type=str, default="climax", help="")
 parser.add_argument("--mode", type=str, default="multistream", help="eager, multistream")
-parser.add_argument("--stream_num", type=int, default=4)
-parser.add_argument("--batch_size", type=int, default=8)
+parser.add_argument("--stream_num", type=int, default=16)
+parser.add_argument("--batch_size", type=int, default=128)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument("--is_training", type=bool, default=False)
-parser.add_argument("--batch_profile", type=bool, default=True)
+parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
 parser.add_argument("--torch_profiling", type=bool, default=False)
 
@@ -106,7 +107,7 @@ else:
     raise ValueError(f"Model {args.model} not supported")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":    
     if args.batch_profile:
         model = get_model()
         # model = torch.compile(model)

@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+*.nsys-rep
+*.sqlite
+
 # C extensions
 *.so
 
