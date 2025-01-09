@@ -10,7 +10,7 @@ from utils import log_results
 import torch
 from pprint import pprint
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-print(torch.cuda.is_available())
+print('torch.cuda.is_available():', torch.cuda.is_available())
 
 
 def single_profile(args, model):    
@@ -45,13 +45,8 @@ def single_profile(args, model):
 
 
 def batch_profile(args, model):
-    batch_sizes = [1, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
-    batch_sizes = [1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32]#, 40, 48, 64, 80, 108, 128]
-    # batch_sizes = [1, 8, 16, 32]
-    stream_nums = [1, 2, 4, 8, 16, 32, 64, 96, 108]
-    stream_nums = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32] # ,64]
-    # batch_sizes = [16]
-    # stream_nums = [10]
+    batch_sizes = [1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48, 52, 56, 60, 64, 68, 72]
+    stream_nums = [1]
     
     results = []
     for batch_size in batch_sizes:
@@ -84,13 +79,13 @@ def batch_profile(args, model):
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="climax", help="")
 parser.add_argument("--mode", type=str, default="multistream", help="eager, multistream")
-parser.add_argument("--stream_num", type=int, default=16)
-parser.add_argument("--batch_size", type=int, default=128)
+parser.add_argument("--stream_num", type=int, default=1)
+parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument("--is_training", type=bool, default=False)
-parser.add_argument("--batch_profile", type=bool, default=False)
+parser.add_argument("--batch_profile", type=bool, default=True)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
 parser.add_argument("--torch_profiling", type=bool, default=False)
 
@@ -110,7 +105,7 @@ else:
 if __name__ == "__main__":    
     if args.batch_profile:
         model = get_model()
-        # model = torch.compile(model)
+        model = torch.compile(model)
         results = batch_profile(args, model)
         log_results(results, args.model)
     else:

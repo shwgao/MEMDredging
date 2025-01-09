@@ -39,7 +39,7 @@ class ModelProfiler:
                         p.step()
                         if i >= wait + warmup + active:
                             break
-                        self.model(*input_data)
+                        self.model(input_data)
 
     def dump_snapshot(self, input_data, save_name):
         if not os.path.exists(f"{self.save_dir}/{save_name}"):
@@ -82,9 +82,9 @@ class ModelProfiler:
                 for batch in data_loader:
                     input_data = batch[0]
                     self.model(*input_data)
-                    
+                
                 end_event.record()
-                memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
+                memory_list.append(torch.cuda.max_memory_reserved() / 1024**3)
                 torch.cuda.synchronize()
                 time_list.append(start_event.elapsed_time(end_event) / 1000.0)
             batch_size = sum([len(batch[0]) for batch in data_loader])
@@ -92,22 +92,19 @@ class ModelProfiler:
             with torch.no_grad():
                 for _ in range(warmup):
                     self.model(*data_loader)
-                    
+                
                 for _ in range(iter):
-                    torch.cuda.empty_cache()
-                    torch.cuda.synchronize()
-                    # start = time.time()
+                    # torch.cuda.empty_cache()
+                    # torch.cuda.synchronize()
                     start_event.record()
                     
                     self.model(*data_loader)
                     end_event.record()
                     
                     # print(f"memory: {torch.cuda.max_memory_allocated() / 1024**3}")    
-                    memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
+                    memory_list.append(torch.cuda.max_memory_reserved() / 1024**3)
                     torch.cuda.synchronize()
                     time_list.append(start_event.elapsed_time(end_event) / 1000.0)
-                    # end = time.time()
-                    # print(f"Time: {end - start:.3f} seconds")
 
         return self._calculate_statistics(time_list, batch_size, memory_list)
 
@@ -129,7 +126,7 @@ class ModelProfiler:
                 start_event.synchronize()
                 
                 self.model(input_data)
-                memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
+                memory_list.append(torch.cuda.max_memory_reserved() / 1024**3)
                 
                 torch.cuda.synchronize()
                 end_event.record()
@@ -140,21 +137,25 @@ class ModelProfiler:
 
         return self._calculate_statistics(time_list, batch_size, memory_list)
 
-    def _calculate_statistics(self, time_list, num_samples, memory_list):
+    def _calculate_statistics(self, time_list, batch_size, memory_list):
         time_array = np.array(time_list)
         mean_time = np.mean(time_array)
         std_time = np.std(time_array)
         mean_memory = np.mean(memory_list)
         std_memory = np.std(memory_list)
-        throughput = num_samples / mean_time
+        throughput = batch_size / mean_time
+        min_throughput = batch_size / time_array.max()
+        max_throughput = batch_size / time_array.min()
 
-        print(f"Mean time:          {mean_time:.3f}         seconds")
+        print(f"Mean time/batch:    {mean_time:.3f}         seconds")
         print(f"Time  Std:          {std_time:.3f}         seconds")
         print(f"Memory usage:       {mean_memory:.4g}          GB")
         print(f"Memory std:         {std_memory:.4g}             GB")
-        print(f"Throughput:         {throughput:.4g}         samples/second")
+        print(f"Throughput:         {throughput:.4g}({min_throughput:.4g}~{max_throughput:.4g}) samples/second")
 
         return {
+            'mean_time_per_batch': mean_time,
+            'batch_size': batch_size,
             'memory': mean_memory,
             'throughput': throughput
         }
