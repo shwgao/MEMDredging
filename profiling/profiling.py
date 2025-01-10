@@ -45,8 +45,8 @@ def single_profile(args, model):
 
 
 def batch_profile(args, model):
-    # batch_sizes = list(range(2, 50, 4))
-    batch_sizes = list(range(2, 33, 2))
+    batch_sizes = list(range(2, 50, 4))
+    # batch_sizes = list(range(2, 33, 2))
     # batch_sizes = [4]
     stream_nums = [1]
     
@@ -79,7 +79,7 @@ def batch_profile(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="enformer", help="")
+parser.add_argument("--model", type=str, default="climax", help="")
 parser.add_argument("--mode", type=str, default="multistream", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=16)
@@ -90,6 +90,8 @@ parser.add_argument("--is_training", type=bool, default=False)
 parser.add_argument("--batch_profile", type=bool, default=True)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
 parser.add_argument("--torch_profiling", type=bool, default=False)
+parser.add_argument("--backend", type=str, default="no_caching", help="pytorch, no_caching, cuda")
+parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
 
 args = parser.parse_args()
 
@@ -103,13 +105,22 @@ elif args.model == "climode":
 else:
     raise ValueError(f"Model {args.model} not supported")
 
+if args.backend == "no_caching":
+    os.environ["PYTORCH_NO_CUDA_MEMORY_CACHING"] = "1"
+elif args.backend == "cuda":
+    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'backend:cudaMallocAsync'
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
     if args.batch_profile:
+        from utils import read_from_file, plot_data_twinx
+
         model = get_model()
         model = torch.compile(model)
         results = batch_profile(args, model)
-        log_results(results, args.model)
+        file_name = log_results(results, args.model+'-'+args.backend+'-'+args.hardware)
+        memory_table, throughput_table, batch_sizes, stream_nums = read_from_file(file_name)
+        plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
+                        save_name=args.model+'-'+args.backend+'-'+args.hardware, x_axis="batch")
     else:
         model = get_model()
         model = torch.compile(model)

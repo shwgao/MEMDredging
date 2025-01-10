@@ -142,7 +142,8 @@ def log_results(results, save_name):
     # log the results using table format but in txt file
     # write memory table first, using stream_num as row, batch_size as column
     batch_sizes = sorted(batch_size_results.keys())
-    with open(f"./logs/{save_name}-{time.strftime('%Y-%m-%d-%H-%M-%S')}.txt", "w") as f:
+    file_name = f"./logs/{save_name}-{time.strftime('%Y-%m-%d-%H-%M-%S')}.txt"
+    with open(file_name, "w") as f:
         f.write("Memory Table\n")
         f.write("Stream Num\\Batch Size | " + " | ".join(map(str, batch_sizes)) + "\n")
         for stream_num in stream_nums:
@@ -167,13 +168,15 @@ def log_results(results, save_name):
                     else "None"
                     for batch_size in batch_sizes
                 ) + "\n"
-            )   
+            )
+            
+    return file_name
 
 
 if __name__ == "__main__":
     # Plot the data
-    memory_table, throughput_table, batch_sizes, stream_nums = read_from_file("logs/climax-2025-01-09-13-14-23.txt")
-    plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, save_name="climax", x_axis="batch")
+    memory_table, throughput_table, batch_sizes, stream_nums = read_from_file("logs/enformer-2025-01-09-19-36-53.txt")
+    plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, save_name="enformer-pytorch-backend-V100", x_axis="batch")
     # plot_data_separate(memory_table, stream_nums, batch_sizes, "Memory", save_name="climode")
     # plot_data_separate(throughput_table, stream_nums, batch_sizes, "Throughput", save_name="climode")
 
