@@ -45,7 +45,9 @@ def single_profile(args, model):
 
 
 def batch_profile(args, model):
-    batch_sizes = [1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48, 52, 56, 60, 64, 68, 72]
+    # batch_sizes = list(range(2, 50, 4))
+    batch_sizes = list(range(2, 33, 2))
+    # batch_sizes = [4]
     stream_nums = [1]
     
     results = []
@@ -77,7 +79,7 @@ def batch_profile(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="climax", help="")
+parser.add_argument("--model", type=str, default="enformer", help="")
 parser.add_argument("--mode", type=str, default="multistream", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=16)

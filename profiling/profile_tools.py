@@ -4,6 +4,8 @@ import numpy as np
 import os
 from torch.utils.data import DataLoader
 from DaYu.asyncPipelineModel import AsyncPipelineModel
+
+
 class ModelProfiler:
     def __init__(self, model=None, save_dir='./logs', device='cuda', is_training=False):
         self.model = model

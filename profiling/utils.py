@@ -172,7 +172,7 @@ def log_results(results, save_name):
 
 if __name__ == "__main__":
     # Plot the data
-    memory_table, throughput_table, batch_sizes, stream_nums = read_from_file("./logs/climax-2025-01-08-16-49-12.txt")
+    memory_table, throughput_table, batch_sizes, stream_nums = read_from_file("logs/climax-2025-01-09-13-14-23.txt")
     plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, save_name="climax", x_axis="batch")
     # plot_data_separate(memory_table, stream_nums, batch_sizes, "Memory", save_name="climode")
     # plot_data_separate(throughput_table, stream_nums, batch_sizes, "Throughput", save_name="climode")

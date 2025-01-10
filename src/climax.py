@@ -201,8 +201,8 @@ class ClimaX(nn.Module):
         # variable aggregation
         x = self.aggregate_variables(x)  # B, L, D
         
-        # empty cache
-        torch.cuda.empty_cache()
+        # # empty cache
+        # torch.cuda.empty_cache()
         
         if not EMBEDDING_ONLY:
             # add pos embedding
