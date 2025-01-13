@@ -92,7 +92,7 @@ def plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, x_
     plt.title(f"Throughput and Memory vs {x_axis}")
     plt.grid()
     plt.tight_layout()
-    plt.savefig(f"./logs/batch_profile-{save_name}.png")
+    plt.savefig(f"./logs/{save_name}.png")
 
 
 def plot_data_separate(table, stream_nums, batch_sizes, title="", save_name=""):
@@ -175,8 +175,8 @@ def log_results(results, save_name):
 
 if __name__ == "__main__":
     # Plot the data
-    memory_table, throughput_table, batch_sizes, stream_nums = read_from_file("logs/enformer-2025-01-09-19-36-53.txt")
-    plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, save_name="enformer-pytorch-backend-V100", x_axis="batch")
-    # plot_data_separate(memory_table, stream_nums, batch_sizes, "Memory", save_name="climode")
-    # plot_data_separate(throughput_table, stream_nums, batch_sizes, "Throughput", save_name="climode")
+    memory_table, throughput_table, batch_sizes, stream_nums = read_from_file("logs/enformer-pytorch-backend-V100-2025-01-10-17-20-00.txt")
+    # plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, save_name="enformer-pytorch-backend-V100", x_axis="batch")
+    plot_data_separate(memory_table, stream_nums, batch_sizes, "Memory", save_name="climode")
+    plot_data_separate(throughput_table, stream_nums, batch_sizes, "Throughput", save_name="climode")
 

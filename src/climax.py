@@ -172,6 +172,75 @@ class ClimaX(nn.Module):
 
         x = x.unflatten(dim=0, sizes=(b, l))  # B, L, D
         return x
+    
+    def batch_aggregate_variables(self, x: torch.Tensor, batch_size: int = 4):
+        """
+        Batch processing version of aggregate_variables to reduce memory usage
+        x: B, V, L, D
+        """
+        total_batch = x.shape[0]
+        num_batches = (total_batch + batch_size - 1) // batch_size
+        output_list = []
+        
+        for i in range(num_batches):
+            start_idx = i * batch_size
+            end_idx = min((i + 1) * batch_size, total_batch)
+            batch_x = x[start_idx:end_idx]
+            
+            # Process small batch
+            batch_output = self.aggregate_variables(batch_x)
+            output_list.append(batch_output)
+            
+        # Concatenate all batches
+        return torch.cat(output_list, dim=0)  # B, L, D
+
+    def forward_encoder2(self, x: torch.Tensor, lead_times: torch.Tensor, variables):
+        # x: `[B, V, H, W]` shape.
+
+        if isinstance(variables, list):
+            variables = tuple(variables)
+
+        # tokenize each variable separately
+        embeds = []
+        var_ids = self.get_var_ids(variables, x.device)
+        
+        # add variable embedding
+        var_embed = self.get_var_emb(self.var_embed, variables).contiguous() # 1, V, D
+
+        for i in range(len(var_ids)):
+            id = var_ids[i]
+            embeds.append(self.token_embeds[id](x[:, i : i + 1].contiguous()))  # B, 1, L, D
+            
+        x = torch.stack(embeds, dim=1)  # B, V, L, D
+        
+        del embeds
+        
+        x += var_embed.unsqueeze(2)  # B, V, L, D
+
+        # Replace original aggregation with batched version
+        x = self.batch_aggregate_variables(x, batch_size=8)  # B, L, D
+        
+        if not EMBEDDING_ONLY:
+            # add pos embedding
+            x = x + self.pos_embed
+            # x += self.pos_embed
+
+            # add lead time embedding
+            lead_time_emb = self.lead_time_embed(lead_times.unsqueeze(-1))  # B, D
+            lead_time_emb = lead_time_emb.unsqueeze(1)
+            x = x + lead_time_emb  # B, L, D
+            # x += lead_time_emb  # B, L, D
+
+            x = self.pos_drop(x)
+            
+            # x = x.to('cuda:2')
+
+            # apply Transformer blocks
+            for blk in self.blocks:
+                x = blk(x)
+            x = self.norm(x)
+
+        return x
 
     def forward_encoder(self, x: torch.Tensor, lead_times: torch.Tensor, variables):
         # x: `[B, V, H, W]` shape.
@@ -189,20 +258,17 @@ class ClimaX(nn.Module):
         for i in range(len(var_ids)):
             id = var_ids[i]
             embeds.append(self.token_embeds[id](x[:, i : i + 1].contiguous()))  # B, 1, L, D
+            
         x = torch.stack(embeds, dim=1)  # B, V, L, D
         # x = fused_stack_add.forward(embeds, var_embed, 1)  # B, V, L, D
         
         x = x + var_embed.unsqueeze(2)  # B, V, L, D
         # x += var_embed.unsqueeze(2)  # B, V, L, D
-        
-        # print(f"Memory usage of x: {x.element_size() * x.nelement() / 1024**2} MB")
-        # print(f"Allocated memory of x: {torch.cuda.memory_allocated(x.device) / 1024**2} MB")
 
         # variable aggregation
         x = self.aggregate_variables(x)  # B, L, D
         
-        # # empty cache
-        # torch.cuda.empty_cache()
+        # x = torch.randn(32, 512, 1024, device='cuda:0')
         
         if not EMBEDDING_ONLY:
             # add pos embedding
