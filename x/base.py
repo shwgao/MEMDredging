@@ -3,6 +3,10 @@ from threading import Thread
 from queue import Queue
 
 class PipelineStage(ABC):
+    """An abstract base class representing a stage in a processing pipeline. I plan to make three stages:
+    DataPreloader, ModelInferencer, and PostProcessor to inherit from this class. We can add some syncronization
+    mechanism to make sure the pipeline is working as expected.
+    """
     def __init__(self, input_queue=None, output_queue=None):
         self.input_queue = input_queue
         self.output_queue = output_queue
@@ -53,7 +57,7 @@ class DataPreloader(PipelineStage):
     def load_and_preprocess(self, data):
         # Simulate loading and preprocessing
         return f"Preprocessed {data}"
-    
+
 
 class ModelInferencer(PipelineStage):
     def __init__(self, model, input_queue, output_queue):
@@ -68,7 +72,7 @@ class ModelInferencer(PipelineStage):
     def model_inference(self, data):
         # Simulate model computation
         return f"Inference result for {data}"
-    
+
 
 class PostProcessor(PipelineStage):
     def process(self, data):

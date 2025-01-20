@@ -74,17 +74,17 @@ def batch_profile(args, model, batch_sizes, stream_nums):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="enformer", help="")
+parser.add_argument("--model", type=str, default="cosmoflow", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
-parser.add_argument("--batch_size", type=int, default=4)
+parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument("--is_training", type=bool, default=False)
 parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
-parser.add_argument("--torch_profiling", type=bool, default=False)
+parser.add_argument("--torch_profiling", type=bool, default=True)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
 parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
 
@@ -100,6 +100,9 @@ elif args.model == "enformer":
 elif args.model == "climode":
     batch_sizes = list(range(2, 50, 8))
     from src.climode import get_model, get_inputs
+elif args.model == "cosmoflow":
+    from src.cosmoflow import get_model, get_inputs
+    batch_sizes = list(range(2, 50, 8))
 else:
     raise ValueError(f"Model {args.model} not supported")
 

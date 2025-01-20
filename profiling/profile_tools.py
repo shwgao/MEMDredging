@@ -41,7 +41,7 @@ class ModelProfiler:
                         p.step()
                         if i >= wait + warmup + active:
                             break
-                        self.model(input_data)
+                        self.model(*input_data)
 
     def dump_snapshot(self, input_data, save_name):
         if not os.path.exists(f"{self.save_dir}/{save_name}"):
