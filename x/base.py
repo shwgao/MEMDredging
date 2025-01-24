@@ -12,6 +12,7 @@ class PipelineStage(ABC):
         self.output_queue = output_queue
         self.thread = Thread(target=self.run)
         self.stop_signal = False
+        self.load_data_signal = False
 
     @abstractmethod
     def process(self, data):
@@ -44,19 +45,51 @@ class PipelineStage(ABC):
 
 
 class DataPreloader(PipelineStage):
-    def __init__(self, input_data_source, output_queue):
-        super().__init__(output_queue=output_queue)
+    def __init__(self, input_data_source, device='cuda'):
+        """
+        Args:
+            input_data_source: a pytorch dataloader
+            device: torch device to load data to (default: 'cuda')
+        """
+        super().__init__(input_queue=Queue())
         self.input_data_source = input_data_source
-
-    def process(self, data):
-        """Load and preprocess data."""
-        # For example, load data from a file, normalize, etc.
-        preprocessed_data = self.load_and_preprocess(data)
-        return preprocessed_data
+        self.device = device
+        self.data_iterator = iter(input_data_source)
+        self.num_batches = len(input_data_source)
+        
+    def process(self):
+        """Load and preprocess data.
+        
+        Returns:
+            Preprocessed data on specified device
+        """
+        try:
+            # Get next batch from dataloader
+            batch = next(self.data_iterator)
+            self.num_batches -= 1
+            return self.load_and_preprocess(batch)
+        except StopIteration:
+            # Signal end of data
+            return None
 
     def load_and_preprocess(self, data):
-        # Simulate loading and preprocessing
-        return f"Preprocessed {data}"
+        """Move data to specified device.
+        
+        Args:
+            data: tuple/list of torch tensors
+        Returns:
+            Same data structure with tensors moved to device
+        """
+        # Handle both single tensors and collections of tensors
+        if isinstance(data, (tuple, list)):
+            return [item.to(self.device) for item in data]
+        return data.to(self.device)
+    
+    def __len__(self):
+        """
+        Return the remaining number of batches in the dataloader.
+        """
+        return self.num_batches
 
 
 class ModelInferencer(PipelineStage):
