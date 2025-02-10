@@ -12,6 +12,8 @@ from pprint import pprint
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 print('torch.cuda.is_available():', torch.cuda.is_available())
 
+# torch.set_float32_matmul_precision('medium')
+
 
 def single_profile(args, model):    
     inputs, batch_index, is_batched = get_inputs(args.batch_size)
@@ -74,17 +76,17 @@ def batch_profile(args, model, batch_sizes, stream_nums):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="cosmoflow", help="")
+parser.add_argument("--model", type=str, default="climax", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
-parser.add_argument("--batch_size", type=int, default=8)
+parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument("--is_training", type=bool, default=False)
 parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
-parser.add_argument("--torch_profiling", type=bool, default=True)
+parser.add_argument("--torch_profiling", type=bool, default=False)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
 parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
 
@@ -93,10 +95,12 @@ args = parser.parse_args()
 # model initialization
 if args.model == "climax":
     from src.climax import get_model, get_inputs
-    batch_sizes = list(range(2, 100, 8))
+    batch_sizes = list(range(2, 120, 4))
+    args.batch_size = 100
 elif args.model == "enformer":
     from src.enformer import get_model, get_inputs
     batch_sizes = list(range(2, 33, 2))
+    args.batch_size = 3
 elif args.model == "climode":
     batch_sizes = list(range(2, 50, 8))
     from src.climode import get_model, get_inputs
@@ -117,12 +121,12 @@ if __name__ == "__main__":
 
         model = get_model()
         model = torch.compile(model)
-        results = batch_profile(args, model, batch_sizes, [1, 2, 4, 8, 12, 16, 20, 24, 28, 32])
+        results = batch_profile(args, model, batch_sizes, [1])
         file_name = log_results(results, args.model+'-'+args.backend+'-'+args.hardware)
-        # memory_table, throughput_table, batch_sizes, stream_nums = read_from_file(file_name)
-        # plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
-        #                 save_name=args.model+'-'+args.backend+'-'+args.hardware, x_axis="batch")
+        memory_table, throughput_table, batch_sizes, stream_nums = read_from_file(file_name)
+        plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
+        save_name=args.model+'-'+args.backend+'-'+args.hardware, x_axis="batch")
     else:
         model = get_model()
-        # model = torch.compile(model)
+        model = torch.compile(model)
         single_profile(args, model)

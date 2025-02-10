@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from timm.models.vision_transformer import Block, PatchEmbed, trunc_normal_
 
-EMBEDDING_ONLY = False
+EMBEDDING_ONLY = True
 
 class ClimaX(nn.Module):
     """Implements the ClimaX model as described in the paper,
@@ -265,12 +265,12 @@ class ClimaX(nn.Module):
         x = x + var_embed.unsqueeze(2)  # B, V, L, D
         # x += var_embed.unsqueeze(2)  # B, V, L, D
 
-        # variable aggregation
-        x = self.aggregate_variables(x)  # B, L, D
-        
-        # x = torch.randn(32, 512, 1024, device='cuda:0')
-        
         if not EMBEDDING_ONLY:
+            # variable aggregation
+            x = self.aggregate_variables(x)  # B, L, D
+        
+            # x = torch.randn(32, 512, 1024, device='cuda:0')
+        
             # add pos embedding
             x = x + self.pos_embed
             # x += self.pos_embed
