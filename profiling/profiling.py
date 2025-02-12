@@ -23,7 +23,8 @@ def single_profile(args, model):
 
     # TODO: we have to add communication time for comprehensive comparison
     if args.communication_time:
-        dlg = DataLoaderGenerator(inputs, args.batch_size, args.batch_num, batch_index, is_batched=is_batched)
+        dlg = DataLoaderGenerator(inputs, args.batch_size, args.batch_num, batch_index, 
+                                  is_batched=is_batched, prefetch_factor=2, num_workers=1)
         data_loader = dlg.get_dataloader()
     else:
         data_loader = [i.to(args.device) if hasattr(i, "to") else i for i in inputs]
@@ -35,7 +36,8 @@ def single_profile(args, model):
         async_model.sliced_input = async_model._slice_input(data_loader, batch_index)  
         profiler.model = async_model
     else:
-        data_loader = tuple(data_loader)
+        if isinstance(data_loader, list):
+            data_loader = tuple(data_loader)
 
     if args.dump_snapshot:
         profiler.dump_snapshot(data_loader, args.model)
@@ -96,7 +98,7 @@ args = parser.parse_args()
 if args.model == "climax":
     from src.climax import get_model, get_inputs
     batch_sizes = list(range(2, 120, 4))
-    args.batch_size = 100
+    args.batch_size = 32
 elif args.model == "enformer":
     from src.enformer import get_model, get_inputs
     batch_sizes = list(range(2, 33, 2))
@@ -122,11 +124,11 @@ if __name__ == "__main__":
         model = get_model()
         model = torch.compile(model)
         results = batch_profile(args, model, batch_sizes, [1])
-        file_name = log_results(results, args.model+'-'+args.backend+'-'+args.hardware)
-        memory_table, throughput_table, batch_sizes, stream_nums = read_from_file(file_name)
-        plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
-        save_name=args.model+'-'+args.backend+'-'+args.hardware, x_axis="batch")
+        # file_name = log_results(results, args.model+'-'+args.backend+'-'+args.hardware)
+        # memory_table, throughput_table, batch_sizes, stream_nums = read_from_file(file_name)
+        # plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
+        # save_name=args.model+'-'+args.backend+'-'+args.hardware, x_axis="batch")
     else:
         model = get_model()
-        model = torch.compile(model)
+        # model = torch.compile(model)
         single_profile(args, model)

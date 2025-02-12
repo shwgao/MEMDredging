@@ -1,7 +1,10 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import time
 import numpy as np
-import os
 from torch.utils.data import DataLoader
 from DaYu.asyncPipelineModel import AsyncPipelineModel
 
@@ -14,7 +17,11 @@ class ModelProfiler:
         self.device = device
         self.model.to(self.device)
         self.is_training = is_training
-    
+        self.optimizer = None
+        
+        if self.is_training:
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        
     @property
     def wrapped_model(self):
         if self._wrapped_model is None and not isinstance(self.model, AsyncPipelineModel):
@@ -63,13 +70,81 @@ class ModelProfiler:
 
     def compute_throughput(self, data_loader, batch_size, mode='eager', warmup=2, iter=5):
         if mode == 'eager':
-            return self._compute_eager_throughput(data_loader, batch_size, warmup, iter)
+            return self.compute_eager_throughput(data_loader, batch_size, warmup, iter)
         elif mode == 'multistream':
-            return self._compute_multistream_throughput(data_loader, batch_size, warmup, iter)
+            return self.compute_multistream_throughput(data_loader, batch_size, warmup, iter)
         else:
             raise ValueError(f"Unknown mode: {mode}")
+    
+    def _compute(self, data):
+        if self.is_training:
+            self.optimizer.zero_grad()
+            
+        loss = self.model(*data)
+        
+        if self.is_training:
+            loss.backward()
+            self.optimizer.step()
+    
+        
+    def compute_eager_batched_data(self, data_loader, start_event, end_event, warmup=1, iter=5):
+        time_list = []
+        memory_list = []
+        for _ in range(warmup):
+            self._compute(data_loader)
+        
+        for _ in range(iter):
+            start_event.record()
+            
+            self._compute(data_loader)
+            
+            end_event.record()
+            
+            memory_list.append(torch.cuda.max_memory_reserved() / 1024**3)
+            torch.cuda.synchronize()
+            time_list.append(start_event.elapsed_time(end_event) / 1000.0)
+            
+        return time_list, memory_list
 
-    def _compute_eager_throughput(self, data_loader, batch_size, warmup=1, iter=5):
+    def compute_eager_dataloader(self, data_loader, start_event, end_event, warmup=1, iter=5):
+        time_list = []
+        memory_list = []
+        
+        count = 0
+        for batch in data_loader:
+            input_data = batch[0]
+            input_data = tuple(
+                i.to(self.device) if isinstance(i, torch.Tensor) else i
+                for i in input_data
+            )
+            self._compute(input_data)
+            
+            count += 1
+            if count >= warmup:
+                break
+        
+        count = 0
+        for batch in data_loader:
+            start_event.record()
+            input_data = batch[0]
+            input_data = tuple(
+                i.to(self.device) if isinstance(i, torch.Tensor) else i
+                for i in input_data
+            )
+            self._compute(input_data)
+            
+            end_event.record()
+            torch.cuda.synchronize()
+            memory_list.append(torch.cuda.max_memory_reserved() / 1024**3)
+            time_list.append(start_event.elapsed_time(end_event) / 1000.0)
+            
+            count += 1
+            if count >= iter:
+                break
+            
+        return time_list, memory_list
+    
+    def compute_eager_throughput(self, data_loader, batch_size, warmup=1, iter=5):
         time_list = []
         memory_list = []
         # Create CUDA events for timing
@@ -77,40 +152,13 @@ class ModelProfiler:
         end_event = torch.cuda.Event(enable_timing=True)
         
         if isinstance(data_loader, DataLoader):
-            for _ in range(iter):
-                torch.cuda.synchronize()
-                start_event.record()
-                
-                for batch in data_loader:
-                    input_data = batch[0]
-                    self.model(*input_data)
-                
-                end_event.record()
-                memory_list.append(torch.cuda.max_memory_reserved() / 1024**3)
-                torch.cuda.synchronize()
-                time_list.append(start_event.elapsed_time(end_event) / 1000.0)
-            batch_size = sum([len(batch[0]) for batch in data_loader])
+            time_list, memory_list = self.compute_eager_dataloader(data_loader, start_event, end_event, warmup, iter)
         else:
-            with torch.no_grad():
-                for _ in range(warmup):
-                    self.model(*data_loader)
-                
-                for _ in range(iter):
-                    # torch.cuda.empty_cache()
-                    # torch.cuda.synchronize()
-                    start_event.record()
-                    
-                    self.model(*data_loader)
-                    end_event.record()
-                    
-                    # print(f"memory: {torch.cuda.max_memory_allocated() / 1024**3}")    
-                    memory_list.append(torch.cuda.max_memory_reserved() / 1024**3)
-                    torch.cuda.synchronize()
-                    time_list.append(start_event.elapsed_time(end_event) / 1000.0)
-
+            time_list, memory_list = self.compute_eager_batched_data(data_loader, start_event, end_event, warmup, iter)
+            
         return self._calculate_statistics(time_list, batch_size, memory_list)
 
-    def _compute_multistream_throughput(self, input_data, batch_size, warmup=2, iter=5):
+    def compute_multistream_throughput(self, input_data, batch_size, warmup=2, iter=5):
         time_list = []
         memory_list = []
         start_event = torch.cuda.Event(enable_timing=True)
@@ -161,6 +209,7 @@ class ModelProfiler:
             'memory': mean_memory,
             'throughput': throughput
         }
+        
 
 
 class ModelWrapper(torch.nn.Module):

@@ -4,7 +4,42 @@ import torch
 import torch.nn as nn
 from timm.models.vision_transformer import Block, PatchEmbed, trunc_normal_
 
-EMBEDDING_ONLY = True
+EMBEDDING_ONLY = False
+
+
+def lat_weighted_mse(pred, y, vars, lat, mask=None):
+    """Latitude weighted mean squared error
+
+    Allows to weight the loss by the cosine of the latitude to account for gridding differences at equator vs. poles.
+
+    Args:
+        y: [B, V, H, W]
+        pred: [B, V, H, W]
+        vars: list of variable names
+        lat: H
+    """
+
+    error = (pred - y) ** 2  # [N, C, H, W]
+
+    # lattitude weights
+    w_lat = np.cos(np.deg2rad(lat))
+    w_lat = w_lat / w_lat.mean()  # (H, )
+    w_lat = torch.from_numpy(w_lat).unsqueeze(0).unsqueeze(-1).to(dtype=error.dtype, device=error.device)  # (1, H, 1)
+
+    loss_dict = {}
+    with torch.no_grad():
+        for i, var in enumerate(vars):
+            if mask is not None:
+                loss_dict[var] = (error[:, i] * w_lat * mask).sum() / mask.sum()
+            else:
+                loss_dict[var] = (error[:, i] * w_lat).mean()
+
+    if mask is not None:
+        loss_dict["loss"] = ((error * w_lat.unsqueeze(1)).mean(dim=1) * mask).sum() / mask.sum()
+    else:
+        loss_dict["loss"] = (error * w_lat.unsqueeze(1)).mean(dim=1).mean()
+
+    return loss_dict
 
 class ClimaX(nn.Module):
     """Implements the ClimaX model as described in the paper,
@@ -62,6 +97,9 @@ class ClimaX(nn.Module):
         # positional embedding and lead time embedding
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim), requires_grad=True)
         self.lead_time_embed = nn.Linear(1, embed_dim)
+        
+        self.out_variables = ["geopotential_500", "temperature_850", "2m_temperature", "10m_u_component_of_wind", "10m_v_component_of_wind"]
+        self.lat = np.random.rand(32)
 
         # --------------------------------------------------------------------------
 
@@ -244,6 +282,7 @@ class ClimaX(nn.Module):
 
     def forward_encoder(self, x: torch.Tensor, lead_times: torch.Tensor, variables):
         # x: `[B, V, H, W]` shape.
+        # default L, D = 512, 1024
 
         if isinstance(variables, list):
             variables = tuple(variables)
@@ -258,13 +297,13 @@ class ClimaX(nn.Module):
         for i in range(len(var_ids)):
             id = var_ids[i]
             embeds.append(self.token_embeds[id](x[:, i : i + 1].contiguous()))  # B, 1, L, D
-            
+        
         x = torch.stack(embeds, dim=1)  # B, V, L, D
         # x = fused_stack_add.forward(embeds, var_embed, 1)  # B, V, L, D
         
         x = x + var_embed.unsqueeze(2)  # B, V, L, D
         # x += var_embed.unsqueeze(2)  # B, V, L, D
-
+        
         if not EMBEDDING_ONLY:
             # variable aggregation
             x = self.aggregate_variables(x)  # B, L, D
@@ -285,16 +324,16 @@ class ClimaX(nn.Module):
             
             # x = x.to('cuda:2')
 
-            # apply Transformer blocks
-            for blk in self.blocks:
-                x = blk(x)
-            x = self.norm(x)
+        # apply Transformer blocks
+        for blk in self.blocks:
+            x = blk(x)
+        x = self.norm(x)
 
         return x
 
     # def forward(self, x, y, lead_times, variables, out_variables, metric, lat):
     # for simplicity, we remove the irrelevant arguments
-    def forward(self, x, lead_times, variables):
+    def forward(self, x, lead_times, variables, y, metrics=[lat_weighted_mse]):
         """Forward pass through the model.
 
         Args:
@@ -307,8 +346,19 @@ class ClimaX(nn.Module):
             preds (torch.Tensor): `[B, Vo, H, W]` shape. Predicted weather/climate variables.
         """
         out_transformers = self.forward_encoder(x, lead_times, variables)  # B, L, D
+        
+        preds = self.head(out_transformers)  # B, L, V*p*p
 
-        return out_transformers
+        preds = self.unpatchify(preds)
+        out_var_ids = self.get_var_ids(tuple(self.out_variables), preds.device)
+        preds = preds[:, out_var_ids]
+
+        if metrics is None:
+            loss = None
+        else:
+            loss = [m(preds, y, self.out_variables, self.lat) for m in metrics]
+
+        return loss[0]['loss']
 
 
 class ModelConfigGlobal:
@@ -381,11 +431,13 @@ def get_model():
 def get_inputs(batch_size):
     # create example data
     x = torch.randn(batch_size, 48, 32, 64, dtype=torch.float32)
+    y = torch.randn(batch_size, 5, 32, 64, dtype=torch.float32)
+    # x = torch.randn(batch_size, 48, 512, 1024, dtype=torch.float32)
     lead_times = torch.tensor([72]*batch_size, dtype=torch.float32)
     variables = model_config.default_vars
     # out_variables = model_config.out_variables
     # inputs = (x, None, lead_times, variables, out_variables, None, None)
-    inputs = (x, lead_times, variables)
+    inputs = (x, lead_times, variables, y)
     batch_index = [0, 1]
     is_batched = True
     return inputs, batch_index, is_batched
