@@ -85,8 +85,8 @@ parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
-parser.add_argument("--is_training", type=bool, default=False)
-parser.add_argument("--batch_profile", type=bool, default=False)
+parser.add_argument("--is_training", type=bool, default=True)
+parser.add_argument("--batch_profile", type=bool, default=True)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
 parser.add_argument("--torch_profiling", type=bool, default=False)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
@@ -121,14 +121,15 @@ if __name__ == "__main__":
     if args.batch_profile:
         from utils import read_from_file, plot_data_twinx
 
-        model = get_model()
-        model = torch.compile(model)
-        results = batch_profile(args, model, batch_sizes, [1])
+        # model = get_model()
+        # model = torch.compile(model)
+        # results = batch_profile(args, model, batch_sizes, [1])
         # file_name = log_results(results, args.model+'-'+args.backend+'-'+args.hardware)
-        # memory_table, throughput_table, batch_sizes, stream_nums = read_from_file(file_name)
-        # plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
-        # save_name=args.model+'-'+args.backend+'-'+args.hardware, x_axis="batch")
+        file_name = 'logs/climax-pytorch-V100-2025-02-13-22-29-54.txt'
+        memory_table, throughput_table, batch_sizes, stream_nums = read_from_file(file_name)
+        plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
+        save_name=args.model+'-'+args.backend+'-'+args.hardware, x_axis="batch")
     else:
         model = get_model()
-        # model = torch.compile(model)
+        model = torch.compile(model)
         single_profile(args, model)

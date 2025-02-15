@@ -31,24 +31,31 @@ class ModelProfiler:
         return self._wrapped_model
 
     def torch_profiling(self, input_data, save_name, wait=1, warmup=1, active=3):
-        with torch.no_grad():
-            with torch.profiler.profile(
-                    activities=[
-                        torch.profiler.ProfilerActivity.CPU,
-                        torch.profiler.ProfilerActivity.CUDA,
-                    ],
-                    schedule=torch.profiler.schedule(wait=wait, warmup=warmup, active=active, repeat=1),
-                    record_shapes=True,
-                    profile_memory=True,
-                    with_stack=True,
-                    with_modules=True,
-                    on_trace_ready=torch.profiler.tensorboard_trace_handler(f'{self.save_dir}/{save_name}-{time.strftime("%Y-%m-%d-%H-%M-%S")}'),
-                ) as p:
+        with torch.profiler.profile(
+                activities=[
+                    torch.profiler.ProfilerActivity.CPU,
+                    torch.profiler.ProfilerActivity.CUDA,
+                ],
+                schedule=torch.profiler.schedule(wait=wait, warmup=warmup, active=active, repeat=1),
+                record_shapes=True,
+                profile_memory=True,
+                with_stack=True,
+                with_modules=True,
+                on_trace_ready=torch.profiler.tensorboard_trace_handler(f'{self.save_dir}/{save_name}-train_{self.is_training}-{time.strftime("%Y-%m-%d-%H-%M-%S")}'),
+            ) as p:
+                if not self.is_training:
+                    with torch.no_grad():
+                        for i in range(10):
+                            p.step()
+                            if i >= wait + warmup + active:
+                                break
+                            self._compute(input_data)
+                else:
                     for i in range(10):
                         p.step()
                         if i >= wait + warmup + active:
                             break
-                        self.model(*input_data)
+                        self._compute(input_data)
 
     def dump_snapshot(self, input_data, save_name):
         if not os.path.exists(f"{self.save_dir}/{save_name}"):
