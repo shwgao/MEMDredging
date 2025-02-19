@@ -1,16 +1,19 @@
 import os
 import sys
+import copy
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import argparse
 from typing import Iterable
 from profile_tools import ModelProfiler, DataLoaderGenerator
 from DaYu.asyncPipelineModel import AsyncPipelineModel
-from utils import log_results
+from utils import log_results, overwrite_dir
 import torch
+import shutil
 from pprint import pprint
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 print('torch.cuda.is_available():', torch.cuda.is_available())
+torch.manual_seed(42)
 
 # torch.set_float32_matmul_precision('medium')
 
@@ -43,7 +46,9 @@ def single_profile(args, model):
         profiler.dump_snapshot(data_loader, args.model)
 
     if args.torch_profiling:
-        profiler.torch_profiling(data_loader, args.model)
+        save_name = args.model + '/' + args.mode + f'train_{args.is_training}-bz{args.batch_size}-{args.hardware}-bagg_{args.batch_cat_aggregate}-mb_{args.mini_batch}'
+        overwrite_dir(save_name)
+        profiler.torch_profiling(data_loader, save_name)
 
     return profiler.compute_throughput(data_loader, batch_size=args.batch_size, mode=args.mode)
 
@@ -76,6 +81,26 @@ def batch_profile(args, model, batch_sizes, stream_nums):
     return results
 
 
+def check_gradients(args, model):
+    profiler = ModelProfiler(model, device=args.device, is_training=args.is_training)
+    model2 = copy.deepcopy(model)
+    profiler2 = ModelProfiler(model2, device=args.device, is_training=args.is_training)
+    
+    profiler.check_parameters_close(model, model2)
+    profiler2.model.batch_aggregate = True
+    profiler2.model.mini_batch = 8
+    
+    inputs, batch_index, is_batched = get_inputs(args.batch_size)
+    
+    data_loader = [i.to(args.device) if hasattr(i, "to") else i for i in inputs]
+    for i in range(3):
+        output1 = profiler._compute(data_loader)
+        output2 = profiler2._compute(data_loader)
+        profiler.check_output_close(output1, output2)
+    
+    profiler.check_gradients_close(model, model2)
+
+
 # args initialization
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="climax", help="")
@@ -86,11 +111,14 @@ parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument("--is_training", type=bool, default=True)
-parser.add_argument("--batch_profile", type=bool, default=True)
+parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
 parser.add_argument("--torch_profiling", type=bool, default=False)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
 parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
+parser.add_argument("--batch_cat_aggregate", type=bool, default=True)
+parser.add_argument("--batch_aggregate", type=bool, default=False)
+parser.add_argument("--mini_batch", type=int, default=8)
 
 args = parser.parse_args()
 
@@ -121,15 +149,21 @@ if __name__ == "__main__":
     if args.batch_profile:
         from utils import read_from_file, plot_data_twinx
 
-        # model = get_model()
+        model = get_model()
+        model.batch_aggregate = True
+        model.mini_batch = 4
         # model = torch.compile(model)
-        # results = batch_profile(args, model, batch_sizes, [1])
-        # file_name = log_results(results, args.model+'-'+args.backend+'-'+args.hardware)
-        file_name = 'logs/climax-pytorch-V100-2025-02-13-22-29-54.txt'
+        results = batch_profile(args, model, batch_sizes, [1])
+        file_name = log_results(results, args.model+'-'+args.backend+'-'+args.hardware)
         memory_table, throughput_table, batch_sizes, stream_nums = read_from_file(file_name)
         plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
-        save_name=args.model+'-'+args.backend+'-'+args.hardware, x_axis="batch")
+        save_name=args.model+'-'+args.backend+'-'+args.hardware+'-train', x_axis="batch")
     else:
         model = get_model()
-        model = torch.compile(model)
+        model.batch_aggregate = args.batch_aggregate
+        model.batch_cat_aggregate = args.batch_cat_aggregate
+        model.mini_batch = args.mini_batch
+        # model = torch.compile(model)
         single_profile(args, model)
+        
+    # check_gradients(args, model)

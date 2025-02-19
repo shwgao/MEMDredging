@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import time
+import os
+import shutil
 from pprint import pprint
 
 def read_from_file(file_path):
@@ -171,6 +173,21 @@ def log_results(results, save_name):
             )
             
     return file_name
+
+
+def overwrite_dir(dir_name):
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+    else:
+        print(f"Directory {dir_name} already exists")
+        # ask if overwrite
+        overwrite = input("Do you want to overwrite the directory? (y/n)")
+        if overwrite == "y":
+            shutil.rmtree(dir_name)
+            os.makedirs(dir_name)
+        else:
+            print("Exiting...")
+            return
 
 
 if __name__ == "__main__":

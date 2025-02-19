@@ -69,8 +69,8 @@ class ClimaX(nn.Module):
         decoder_depth=2,
         num_heads=16,
         mlp_ratio=4.0,
-        drop_path=0.1,
-        drop_rate=0.1,
+        drop_path=0.,  # TODO: I removed drop_path
+        drop_rate=0.,  # TODO: I removed drop_rate
         parallel_patch_embed=False,
     ):
         super().__init__()
@@ -104,8 +104,8 @@ class ClimaX(nn.Module):
         # --------------------------------------------------------------------------
 
         # ViT backbone
-        self.pos_drop = nn.Dropout(p=drop_rate)
-        dpr = [x.item() for x in torch.linspace(0, drop_path, depth)]  # stochastic depth decay rule
+        self.pos_drop = nn.Dropout(p=0.)
+        dpr = [x.item() for x in torch.linspace(0, 0., depth)]  # stochastic depth decay rule
         self.blocks = nn.ModuleList(
             [
                 Block(
@@ -132,6 +132,10 @@ class ClimaX(nn.Module):
         self.head = nn.Sequential(*self.head)
 
         # --------------------------------------------------------------------------
+        
+        self.batch_cat_aggregate = False
+        self.batch_aggregate = False
+        self.mini_batch = 8
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -231,6 +235,28 @@ class ClimaX(nn.Module):
             
         # Concatenate all batches
         return torch.cat(output_list, dim=0)  # B, L, D
+    
+    def batched_cat_aggregate(self, x, var_embed, batch_size=8):
+        total_batch = len(x)
+        num_batches = (total_batch + batch_size - 1) // batch_size
+        output_list = []
+        
+        for i in range(num_batches):
+            start_idx = i * batch_size
+            end_idx = min((i + 1) * batch_size, total_batch)
+            batch_x = [x[i][start_idx:end_idx] for i in range(len(x))]
+            
+            # batch_embed = var_embed[:, start_idx:end_idx, :]
+            
+            batch_x = torch.stack(batch_x, dim=1)
+            batch_x += var_embed.unsqueeze(2)
+            
+            # Process small batch
+            batch_output = self.aggregate_variables(batch_x)
+            output_list.append(batch_output)
+            
+        # Concatenate all batches
+        return torch.cat(output_list, dim=0)  # B, L, D
 
     def forward_encoder2(self, x: torch.Tensor, lead_times: torch.Tensor, variables):
         # x: `[B, V, H, W]` shape.
@@ -251,9 +277,8 @@ class ClimaX(nn.Module):
             
         x = torch.stack(embeds, dim=1)  # B, V, L, D
         
-        del embeds
-        
-        x += var_embed.unsqueeze(2)  # B, V, L, D
+        x = x + var_embed.unsqueeze(2)  # B, V, L, D
+        # x += var_embed.unsqueeze(2)  # B, V, L, D
 
         # Replace original aggregation with batched version
         x = self.batch_aggregate_variables(x, batch_size=8)  # B, L, D
@@ -298,18 +323,23 @@ class ClimaX(nn.Module):
             id = var_ids[i]
             embeds.append(self.token_embeds[id](x[:, i : i + 1].contiguous()))  # B, 1, L, D
         
-        x = torch.stack(embeds, dim=1)  # B, V, L, D
-        # x = fused_stack_add.forward(embeds, var_embed, 1)  # B, V, L, D
-        
-        x = x + var_embed.unsqueeze(2)  # B, V, L, D
-        # x += var_embed.unsqueeze(2)  # B, V, L, D
+        if not self.batch_cat_aggregate:
+            x = torch.stack(embeds, dim=1)  # B, V, L, D
+            # x = fused_stack_add.forward(embeds, var_embed, 1)  # B, V, L, D
+            
+            x = x + var_embed.unsqueeze(2)  # B, V, L, D
+            # x += var_embed.unsqueeze(2)  # B, V, L, D
+            
+            # variable aggregation
+            if self.batch_aggregate:
+                x = self.batch_aggregate_variables(x, batch_size=self.mini_batch)  # B, L, D
+            else:
+                x = self.aggregate_variables(x)  # B, L, D
+        else:
+            x = self.batched_cat_aggregate(embeds, var_embed, batch_size=self.mini_batch)  # B, L, D
         
         if not EMBEDDING_ONLY:
-            # variable aggregation
-            x = self.aggregate_variables(x)  # B, L, D
-        
             # x = torch.randn(32, 512, 1024, device='cuda:0')
-        
             # add pos embedding
             x = x + self.pos_embed
             # x += self.pos_embed
@@ -441,3 +471,17 @@ def get_inputs(batch_size):
     batch_index = [0, 1]
     is_batched = True
     return inputs, batch_index, is_batched
+
+
+if __name__ == "__main__":
+    # test
+    model = get_model()
+    inputs, batch_index, is_batched = get_inputs(3)
+    data_loader = [i.to('cuda:0') if hasattr(i, "to") else i for i in inputs]
+    model = model.to('cuda:0')
+    out_transformers = model(*data_loader)
+    out_transformers2 = model(*data_loader)
+    print(out_transformers)
+    print(out_transformers2)
+    print(torch.allclose(out_transformers, out_transformers2, atol=1e-8, rtol=1e-8))
+    print(torch.max(torch.abs(out_transformers - out_transformers2)))

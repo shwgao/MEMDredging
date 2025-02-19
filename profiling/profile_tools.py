@@ -8,6 +8,8 @@ import numpy as np
 from torch.utils.data import DataLoader
 from DaYu.asyncPipelineModel import AsyncPipelineModel
 
+from pynvml import nvmlInit, nvmlDeviceGetMemoryInfo, nvmlDeviceGetHandleByIndex
+
 
 class ModelProfiler:
     def __init__(self, model=None, save_dir='./logs', device='cuda', is_training=False):
@@ -22,6 +24,8 @@ class ModelProfiler:
         if self.is_training:
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         
+        nvmlInit()  # Add NVML initialization
+    
     @property
     def wrapped_model(self):
         if self._wrapped_model is None and not isinstance(self.model, AsyncPipelineModel):
@@ -29,8 +33,38 @@ class ModelProfiler:
         elif isinstance(self.model, AsyncPipelineModel):
             self._wrapped_model = self.model
         return self._wrapped_model
-
-    def torch_profiling(self, input_data, save_name, wait=1, warmup=1, active=3):
+    
+    @staticmethod
+    def check_gradients_close(model1, model2):
+        index = 0
+        for param1, param2 in zip(model1.parameters(), model2.parameters()):
+            if param1.grad is None and param2.grad is None:
+                print(f"Warning: Gradient is None for one or both parameters")
+                continue
+            if not torch.allclose(param1.grad, param2.grad, atol=1e-6, rtol=1e-6):
+                print(f"Gradient mismatch for parameter {index}, Gradient difference (max): {torch.max(torch.abs(param1.grad - param2.grad))}")
+            # else:
+            #     print(f"Gradient for parameter {index} has shape {param1.grad.shape} and {param2.grad.shape} and is close")
+            index += 1
+        return True
+    
+    @staticmethod
+    def check_parameters_close(model1, model2):
+        index = 0
+        for param1, param2 in zip(model1.parameters(), model2.parameters()):
+            if not torch.allclose(param1, param2, atol=1e-8, rtol=1e-8):
+                print(f"Parameter mismatch for parameter {index}, Parameter difference (max): {torch.max(torch.abs(param1 - param2))}")
+            # else:
+            #     print(f"Parameter for parameter {index} has shape {param1.shape} and {param2.shape} and is close")
+            index += 1
+        return True
+    
+    def check_output_close(self, output1, output2):
+        if not torch.allclose(output1, output2, atol=1e-8, rtol=1e-8):
+            print(f"Output mismatch, Output difference (max): {torch.max(torch.abs(output1 - output2))}")
+        return True
+    
+    def torch_profiling(self, input_data, save_name, wait=0, warmup=0, active=3):
         with torch.profiler.profile(
                 activities=[
                     torch.profiler.ProfilerActivity.CPU,
@@ -41,7 +75,7 @@ class ModelProfiler:
                 profile_memory=True,
                 with_stack=True,
                 with_modules=True,
-                on_trace_ready=torch.profiler.tensorboard_trace_handler(f'{self.save_dir}/{save_name}-train_{self.is_training}-{time.strftime("%Y-%m-%d-%H-%M-%S")}'),
+                on_trace_ready=torch.profiler.tensorboard_trace_handler(f'{self.save_dir}/{save_name}'),
             ) as p:
                 if not self.is_training:
                     with torch.no_grad():
@@ -92,6 +126,8 @@ class ModelProfiler:
         if self.is_training:
             loss.backward()
             self.optimizer.step()
+        
+        return loss
     
         
     def compute_eager_batched_data(self, data_loader, start_event, end_event, warmup=1, iter=5):
@@ -101,13 +137,16 @@ class ModelProfiler:
             self._compute(data_loader)
         
         for _ in range(iter):
+            torch.cuda.reset_peak_memory_stats()
             start_event.record()
             
             self._compute(data_loader)
             
             end_event.record()
             
-            memory_list.append(torch.cuda.max_memory_reserved() / 1024**3)
+            memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
+            # handle = nvmlDeviceGetHandleByIndex(0)
+            # memory_list.append(nvmlDeviceGetMemoryInfo(handle).used / 1024**3)
             torch.cuda.synchronize()
             time_list.append(start_event.elapsed_time(end_event) / 1000.0)
             
