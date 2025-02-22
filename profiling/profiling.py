@@ -7,7 +7,7 @@ import argparse
 from typing import Iterable
 from profile_tools import ModelProfiler, DataLoaderGenerator
 from DaYu.asyncPipelineModel import AsyncPipelineModel
-from utils import log_results, overwrite_dir
+from utils import log_results, overwrite_dir, clean_cuda_cache
 import torch
 import shutil
 from pprint import pprint
@@ -44,11 +44,15 @@ def single_profile(args, model):
 
     if args.dump_snapshot:
         profiler.dump_snapshot(data_loader, args.model)
+        
+    clean_cuda_cache()
 
     if args.torch_profiling:
-        save_name = args.model + '/' + args.mode + f'train_{args.is_training}-bz{args.batch_size}-{args.hardware}-bagg_{args.batch_cat_aggregate}-mb_{args.mini_batch}'
+        save_name = 'logs/' + args.model + '/' + args.mode + f'train_{args.is_training}-bz{args.batch_size}-{args.hardware}-bagg_{args.batch_cat_aggregate}-mb_{args.mini_batch}'
         overwrite_dir(save_name)
-        profiler.torch_profiling(data_loader, save_name)
+        profiler.torch_profiling(data_loader, save_name, wait=0, warmup=0, active=3)
+    
+    clean_cuda_cache()
 
     return profiler.compute_throughput(data_loader, batch_size=args.batch_size, mode=args.mode)
 
@@ -110,10 +114,10 @@ parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
-parser.add_argument("--is_training", type=bool, default=True)
+parser.add_argument("--is_training", type=bool, default=False)
 parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
-parser.add_argument("--torch_profiling", type=bool, default=False)
+parser.add_argument("--torch_profiling", type=bool, default=True)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
 parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
 parser.add_argument("--batch_cat_aggregate", type=bool, default=True)

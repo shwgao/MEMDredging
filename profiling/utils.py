@@ -3,6 +3,7 @@ import numpy as np
 import time
 import os
 import shutil
+import torch
 from pprint import pprint
 
 def read_from_file(file_path):
@@ -188,6 +189,13 @@ def overwrite_dir(dir_name):
         else:
             print("Exiting...")
             return
+
+
+def clean_cuda_cache():
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.synchronize()
+    print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**3:.4g} GB")
 
 
 if __name__ == "__main__":

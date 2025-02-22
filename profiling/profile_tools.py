@@ -137,7 +137,7 @@ class ModelProfiler:
             self._compute(data_loader)
         
         for _ in range(iter):
-            torch.cuda.reset_peak_memory_stats()
+            # torch.cuda.reset_peak_memory_stats()
             start_event.record()
             
             self._compute(data_loader)
