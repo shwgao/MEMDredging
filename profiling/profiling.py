@@ -21,6 +21,11 @@ torch.manual_seed(42)
 def single_profile(args, model):    
     inputs, batch_index, is_batched = get_inputs(args.batch_size)
     
+    if args.is_training:
+        model.train()
+    else:
+        model.eval()
+    
     # profiler
     profiler = ModelProfiler(model, device=args.device, is_training=args.is_training)
 
@@ -48,13 +53,17 @@ def single_profile(args, model):
     clean_cuda_cache()
 
     if args.torch_profiling:
-        save_name = 'logs/' + args.model + '/' + args.mode + f'train_{args.is_training}-bz{args.batch_size}-{args.hardware}-bagg_{args.batch_cat_aggregate}-mb_{args.mini_batch}'
+        save_name = 'logs/' + args.model + '/' + args.mode + f'train_{args.is_training}-bz{args.batch_size}-{args.hardware}-bagg_{args.batch_aggregate}-mb_{args.mini_batch}'
         overwrite_dir(save_name)
-        profiler.torch_profiling(data_loader, save_name, wait=0, warmup=0, active=3)
+        profiler.torch_profiling(data_loader, save_name, wait=1, warmup=1, active=3)
     
     clean_cuda_cache()
-
-    return profiler.compute_throughput(data_loader, batch_size=args.batch_size, mode=args.mode)
+    
+    if args.is_training:
+        return profiler.compute_throughput(data_loader, batch_size=args.batch_size, mode=args.mode)
+    else:
+        with torch.no_grad():
+            return profiler.compute_throughput(data_loader, batch_size=args.batch_size, mode=args.mode)
 
 
 def batch_profile(args, model, batch_sizes, stream_nums): 
@@ -107,7 +116,7 @@ def check_gradients(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="climax", help="")
+parser.add_argument("--model", type=str, default="sam", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=32)
@@ -120,9 +129,9 @@ parser.add_argument("--dump_snapshot", type=bool, default=False)
 parser.add_argument("--torch_profiling", type=bool, default=True)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
 parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
-parser.add_argument("--batch_cat_aggregate", type=bool, default=True)
+parser.add_argument("--batch_cat_aggregate", type=bool, default=False, help="Only useful for enformer")
 parser.add_argument("--batch_aggregate", type=bool, default=False)
-parser.add_argument("--mini_batch", type=int, default=8)
+parser.add_argument("--mini_batch", type=int, default=4)
 
 args = parser.parse_args()
 
@@ -134,13 +143,17 @@ if args.model == "climax":
 elif args.model == "enformer":
     from src.enformer import get_model, get_inputs
     batch_sizes = list(range(2, 33, 2))
-    args.batch_size = 3
+    args.batch_size = 2
 elif args.model == "climode":
     batch_sizes = list(range(2, 50, 8))
     from src.climode import get_model, get_inputs
 elif args.model == "cosmoflow":
     from src.cosmoflow import get_model, get_inputs
     batch_sizes = list(range(2, 50, 8))
+elif args.model == "sam":
+    from src.sam import get_model, get_inputs
+    batch_sizes = list(range(2, 20, 2))
+    args.batch_size = 10
 else:
     raise ValueError(f"Model {args.model} not supported")
 

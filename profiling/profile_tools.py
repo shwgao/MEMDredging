@@ -75,7 +75,7 @@ class ModelProfiler:
                 profile_memory=True,
                 with_stack=True,
                 with_modules=True,
-                on_trace_ready=torch.profiler.tensorboard_trace_handler(f'{self.save_dir}/{save_name}'),
+                on_trace_ready=torch.profiler.tensorboard_trace_handler(f'{save_name}'),
             ) as p:
                 if not self.is_training:
                     with torch.no_grad():
@@ -129,7 +129,6 @@ class ModelProfiler:
         
         return loss
     
-        
     def compute_eager_batched_data(self, data_loader, start_event, end_event, warmup=1, iter=5):
         time_list = []
         memory_list = []

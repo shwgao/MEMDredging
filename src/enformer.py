@@ -8,10 +8,292 @@ import torch.distributed as dist
 from torch.utils.checkpoint import checkpoint_sequential
 from einops import rearrange
 from einops.layers.torch import Rearrange
-from transformers import PreTrainedModel
+from transformers import PreTrainedModel, PretrainedConfig
 
 
-class Enformer(nn.Module):
+class EnformerConfig(PretrainedConfig):
+    model_type = "enformer"
+
+    def __init__(
+        self,
+        dim = 1536,
+        depth = 11,
+        heads = 8,
+        output_heads = dict(human = 5313, mouse= 1643),
+        target_length = 896,
+        attn_dim_key = 64,
+        dropout_rate = 0.4,
+        attn_dropout = 0.05,
+        pos_dropout = 0.01,
+        use_checkpointing = True,
+        use_convnext = False,
+        num_downsamples = 7,    # genetic sequence is downsampled 2 ** 7 == 128x in default Enformer - can be changed for higher resolution
+        dim_divisible_by = 128,
+        use_tf_gamma = False,
+        **kwargs,
+    ):
+        self.dim = dim
+        self.depth = depth
+        self.heads = heads
+        self.output_heads = output_heads
+        self.target_length = target_length
+        self.attn_dim_key = attn_dim_key
+        self.dropout_rate = dropout_rate
+        self.attn_dropout = attn_dropout
+        self.pos_dropout = pos_dropout
+        self.use_checkpointing = use_checkpointing
+        self.num_downsamples = num_downsamples
+        self.dim_divisible_by = dim_divisible_by
+        self.use_tf_gamma = use_tf_gamma
+
+        super().__init__(**kwargs)
+
+
+class Enformer(PreTrainedModel):
+    config_class = EnformerConfig
+    base_model_prefix = "enformer"
+
+    @staticmethod
+    def from_hparams(**kwargs):
+        return Enformer(EnformerConfig(**kwargs))
+    
+    def __init__(self, config):
+        super().__init__(config)
+        self.dim = config.dim
+        half_dim = config.dim // 2
+        twice_dim = config.dim * 2
+
+        # create stem
+
+        self.stem = nn.Sequential(
+            nn.Conv1d(4, half_dim, 15, padding = 7),
+            Residual(ConvBlock(half_dim)),
+            AttentionPool(half_dim, pool_size = 2)
+        )
+
+        # create conv tower
+
+        filter_list = exponential_linspace_int(half_dim, config.dim, num = (config.num_downsamples - 1), divisible_by = config.dim_divisible_by)
+        filter_list = [half_dim, *filter_list]
+
+        conv_layers = []
+        for dim_in, dim_out in zip(filter_list[:-1], filter_list[1:]):
+            conv_layers.append(nn.Sequential(
+                ConvBlock(dim_in, dim_out, kernel_size = 5),
+                Residual(ConvBlock(dim_out, dim_out, 1)),
+                AttentionPool(dim_out, pool_size = 2)
+            ))
+
+        # original code
+        self.conv_tower = nn.Sequential(*conv_layers)
+
+        # my implementation
+        # self.conv_tower = conv_layers
+
+        # whether to use tensorflow gamma positions
+
+        use_tf_gamma = config.use_tf_gamma
+        self.use_tf_gamma = use_tf_gamma
+
+        # transformer
+
+        transformer = []
+        for _ in range(config.depth):
+            transformer.append(nn.Sequential(
+                Residual(nn.Sequential(
+                    nn.LayerNorm(config.dim),
+                    Attention(
+                        config.dim,
+                        heads = config.heads,
+                        dim_key = config.attn_dim_key,
+                        dim_value = config.dim // config.heads,
+                        dropout = config.attn_dropout,
+                        pos_dropout = config.pos_dropout,
+                        num_rel_pos_features = config.dim // config.heads,
+                        use_tf_gamma = use_tf_gamma
+                    ),
+                    nn.Dropout(config.dropout_rate)
+                )),
+                Residual(nn.Sequential(
+                    nn.LayerNorm(config.dim),
+                    nn.Linear(config.dim, config.dim * 2),
+                    nn.Dropout(config.dropout_rate),
+                    nn.ReLU(),
+                    nn.Linear(config.dim * 2, config.dim),
+                    nn.Dropout(config.dropout_rate)
+                ))
+            ))
+
+        self.transformer = nn.Sequential(*transformer)
+
+        # target cropping
+
+        self.target_length = config.target_length
+        self.crop_final = TargetLengthCrop(config.target_length)
+
+        # final pointwise
+
+        self.final_pointwise = nn.Sequential(
+            Rearrange('b n d -> b d n'),
+            ConvBlock(filter_list[-1], twice_dim, 1),
+            Rearrange('b d n -> b n d'),
+            nn.Dropout(config.dropout_rate / 8),
+            GELU()
+        )
+
+        # create trunk sequential module
+
+        # self._trunk = nn.Sequential(
+        #     Rearrange('b n d -> b d n'),
+        #     self.stem,
+        #     self.conv_tower,
+        #     Rearrange('b d n -> b n d'),
+        #     self.transformer,
+        #     self.crop_final,
+        #     self.final_pointwise
+        # )
+
+        # create final heads for human and mouse
+
+        self.add_heads(**config.output_heads)
+
+        # use checkpointing on transformer trunk
+
+        self.use_checkpointing = config.use_checkpointing
+        
+        self.batch_aggregate = False
+
+    def add_heads(self, **kwargs):
+        self.output_heads = kwargs
+
+        self._heads = nn.ModuleDict(map_values(lambda features: nn.Sequential(
+            nn.Linear(self.dim * 2, features),
+            nn.Softplus()
+        ), kwargs))
+
+    def set_target_length(self, target_length):
+        crop_module = self._trunk[-2]
+        crop_module.target_length = target_length
+
+    @property
+    def trunk(self):
+        return self._trunk
+
+    @property
+    def heads(self):
+        return self._heads
+
+    def trunk_checkpointed(self, x):
+        x = rearrange(x, 'b n d -> b d n')
+        x = self.stem(x)
+        x = self.conv_tower(x)
+        x = rearrange(x, 'b d n -> b n d')
+        x = checkpoint_sequential(self.transformer, len(self.transformer), x)
+        x = self.crop_final(x)
+        x = self.final_pointwise(x)
+        return x
+
+    def forward(
+        self,
+        x,
+        target = None,
+        return_corr_coef = False,
+        return_embeddings = False,
+        return_only_embeddings = False,
+        head = 'human',
+        target_length = None
+    ):
+        if isinstance(x, list):
+            x = str_to_one_hot(x)
+
+        elif type(x) == torch.Tensor and x.dtype == torch.long:
+            x = seq_indices_to_one_hot(x)
+        x.to(self.device)
+
+        no_batch = x.ndim == 2
+
+        if no_batch:
+            x = rearrange(x, '... -> () ...')
+
+        if exists(target_length):
+            self.set_target_length(target_length)
+
+        # original
+        # trunk_fn = self.trunk_checkpointed if self.use_checkpointing else self._trunk
+        # x = trunk_fn(x)
+        
+        # my implementation
+        x = rearrange(x, 'b n d -> b d n')
+        if self.batch_aggregate:
+            # split the batch into mini-batches
+            fn = nn.Sequential(self.stem, self.conv_tower[0], self.conv_tower[1])
+            x = micro_batch(x, fn, x.shape[0], self.mini_batch)
+            # x = micro_batch(x, self.stem, x.shape[0], self.mini_batch)
+            # x = micro_batch(x, self.conv_tower[0], x.shape[0], self.mini_batch)
+            for i in range(2, len(self.conv_tower)):
+                x = self.conv_tower[i](x)
+        else:
+            x = self.stem(x)
+            x = self.conv_tower(x)
+        
+        x = rearrange(x, 'b d n -> b n d')
+        x = checkpoint_sequential(self.transformer, len(self.transformer), x, use_reentrant=True) if self.use_checkpointing else self.transformer(x)
+        x = self.crop_final(x)
+        x = self.final_pointwise(x)
+
+        if no_batch:
+            x = rearrange(x, '() ... -> ...')
+
+        if return_only_embeddings:
+            return x
+
+        out = map_values(lambda fn: fn(x), self._heads)
+
+        if exists(head):
+            assert head in self._heads, f'head {head} not found'
+            out = out[head]
+
+        if exists(target):
+            assert exists(head), 'head must be passed in if one were to calculate loss directly with targets'
+
+            if return_corr_coef:
+                return pearson_corr_coef(out, target)
+
+            return poisson_loss(out, target)
+
+        if return_embeddings:
+            return out, x
+
+        return out
+
+
+def pearson_corr_coef(x, y, dim = 1, reduce_dims = (-1,)):
+    x_centered = x - x.mean(dim = dim, keepdim = True)
+    y_centered = y - y.mean(dim = dim, keepdim = True)
+    return F.cosine_similarity(x_centered, y_centered, dim = dim).mean(dim = reduce_dims)
+
+
+def poisson_loss(pred, target):
+    return (pred - target * log(pred)).mean()
+
+
+def log(t, eps = 1e-20):
+    return torch.log(t.clamp(min = eps))
+
+
+def micro_batch(input, fn, batch_size, mini_batch):
+    mini_batch_size = max(1, batch_size // mini_batch)
+    output = []
+    for i in range(mini_batch_size):
+        start = i * mini_batch
+        end = min((i+1) * mini_batch, batch_size)
+        # x_i = fn(input[start:end, :, :])
+        x_i = checkpoint_sequential(fn, len(fn), input[start:end, :, :], use_reentrant=True)
+        output.append(x_i)
+    x = torch.cat(output, dim=0)
+    return x
+
+class Enformer2(nn.Module):
     def __init__(self):
         super().__init__()
         self.dim = 1536
@@ -90,12 +372,10 @@ class Enformer(nn.Module):
         x = rearrange(x, 'b n d -> b d n')
         x = self.stem(x)
         x = self.conv_tower(x)
-        # print(f"Memory useage of x after conv_tower: {x.element_size() * x.nelement() / 1024 / 1024} MB")
-        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
         x = rearrange(x, 'b d n -> b n d')
-        # x = checkpoint_sequential(self.transformer, len(self.transformer), x)
-        # x = self.crop_final(x)
-        # x = self.final_pointwise(x)
+        x = checkpoint_sequential(self.transformer, len(self.transformer), x)
+        x = self.crop_final(x)
+        x = self.final_pointwise(x)
         return x
    
     def forward(
@@ -104,6 +384,9 @@ class Enformer(nn.Module):
         return_only_embeddings = False,
         target_length = None
     ):
+        if isinstance(x, tuple):
+            x = x[0]  # Extract the tensor from the tuple
+
         if isinstance(x, list):
             x = str_to_one_hot(x)
 
@@ -208,7 +491,6 @@ class AttentionPool(nn.Module):
             self.to_attn_logits.weight.mul_(2)
 
     def forward(self, x):  
-        # print(f"Memory consumption inside attention pool: {torch.cuda.memory_allocated() / 1024 / 1024} MB")      
         b, _, n = x.shape
         remainder = n % self.pool_size
         needs_padding = remainder > 0
@@ -217,42 +499,18 @@ class AttentionPool(nn.Module):
             x = F.pad(x, (0, remainder), value = 0)
             mask = torch.zeros((b, 1, n), dtype = torch.bool, device = x.device)
             mask = F.pad(mask, (0, remainder), value = True)
-        
-            # print(f"Memory consumption after padding: {x.element_size() * x.nelement() / 1024 / 1024} MB")
-            # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-            # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
 
         x = self.pool_fn(x)
-        
-        # print(f"Memory consumption after pool: {x.element_size() * x.nelement() / 1024 / 1024} MB")
-        # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
-        
+
         logits = self.to_attn_logits(x)
-        
-        # print(f"Memory consumption after logits: {logits.element_size() * logits.nelement() / 1024 / 1024} MB")
-        # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
         
         if needs_padding:
             mask_value = -torch.finfo(logits.dtype).max
             logits = logits.masked_fill(self.pool_fn(mask), mask_value)
-        
-        # print(f"Memory consumption after masked fill: {logits.element_size() * logits.nelement() / 1024 / 1024} MB")
-        # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
 
         attn = logits.softmax(dim = -1)
-
-        # print(f"Memory consumption after softmax: {attn.element_size() * attn.nelement() / 1024 / 1024} MB")
-        # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
-        
+      
         out = (x * attn).sum(dim = -1)
-
-        # print(f"Memory consumption after sum: {out.element_size() * out.nelement() / 1024 / 1024} MB")
-        # print(f"Memory consumption: {torch.cuda.memory_allocated() / 1024 / 1024} MB")
-        # print(f"Max memory consumption: {torch.cuda.max_memory_allocated() / 1024 / 1024} MB")
 
         return out
 
@@ -458,24 +716,37 @@ class Stem(nn.Module):
 
 
 def get_model():
-    return Enformer()
+    model = Enformer.from_hparams(
+        dim = 1536,
+        depth = 11,
+        heads = 8,
+        output_heads = dict(human = 5313, mouse = 1643),
+        target_length = 200,
+        use_checkpointing = True,
+    )
+    
+    return model
 
 
 def get_inputs(batch_size):
     # create batched example data
-    inputs = (torch.randint(0, 5, (batch_size, 196_608)),)
+    seq = torch.randint(0, 5, (batch_size, 196_608))
+    target = torch.randn(batch_size, 200, 5313)
+    inputs = (seq, target)
     batch_index = [0]
     is_batched = True
     return inputs, batch_index, is_batched
 
 
 if __name__ == "__main__":
-    model = Enformer()
-    seq = (torch.randint(0, 5, (8, 196_608)).to('cuda'),) # for ACGTN, in that order (-1 for padding)
-
+    model = get_model()
+    seq = torch.randint(0, 5, (8, 196_608)).to('cuda') # for ACGTN, in that order (-1 for padding)
+    target = torch.randn(8, 200, 5313).to('cuda')
+    
     step = 0
     model.to('cuda')
     model.eval()
 
     with torch.no_grad():
-        output = model(seq)
+        output = model(seq, target)
+        print(output)
