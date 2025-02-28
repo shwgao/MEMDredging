@@ -11,6 +11,7 @@ from utils import log_results, overwrite_dir, clean_cuda_cache
 import torch
 import shutil
 from pprint import pprint
+from torch.export import export
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 print('torch.cuda.is_available():', torch.cuda.is_available())
 torch.manual_seed(42)
@@ -20,6 +21,10 @@ torch.manual_seed(42)
 
 def single_profile(args, model):    
     inputs, batch_index, is_batched = get_inputs(args.batch_size)
+    
+    export_model = export(model, inputs)
+    print(export_model)
+    return export_model
     
     if args.is_training:
         model.train()
@@ -84,11 +89,7 @@ def batch_profile(args, model, batch_sizes, stream_nums):
                 print(f"Error: {e}: batch_size={batch_size}, stream_num={stream_num}")
                 continue
             
-            # clear cuda cache
-            torch.cuda.empty_cache()
-            torch.cuda.reset_peak_memory_stats()
-            torch.cuda.synchronize()
-            print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**3:.4g} GB")
+            clean_cuda_cache()
             
     pprint(results)
     return results
@@ -116,44 +117,50 @@ def check_gradients(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="sam", help="")
+parser.add_argument("--model", type=str, default="enformer", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
-parser.add_argument("--is_training", type=bool, default=False)
+parser.add_argument("--is_training", type=bool, default=True)
 parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
-parser.add_argument("--torch_profiling", type=bool, default=True)
+parser.add_argument("--torch_profiling", type=bool, default=False)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
 parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
-parser.add_argument("--batch_cat_aggregate", type=bool, default=False, help="Only useful for enformer")
+parser.add_argument("--batch_cat_aggregate", type=bool, default=False, help="Only useful for climax")
 parser.add_argument("--batch_aggregate", type=bool, default=False)
-parser.add_argument("--mini_batch", type=int, default=4)
+parser.add_argument("--mini_batch", type=int, default=2)
 
 args = parser.parse_args()
 
 # model initialization
 if args.model == "climax":
     from src.climax import get_model, get_inputs
-    batch_sizes = list(range(2, 120, 4))
+    batch_sizes = list(range(1, 60, 2))
     args.batch_size = 32
 elif args.model == "enformer":
     from src.enformer import get_model, get_inputs
-    batch_sizes = list(range(2, 33, 2))
-    args.batch_size = 2
-elif args.model == "climode":
-    batch_sizes = list(range(2, 50, 8))
+    batch_sizes = list(range(1, 12, 1))
+    args.batch_size = 8
+elif args.model == "climode": # seems not suitable for our work because of large portion of cpus computation
+    batch_sizes = list(range(2, 100, 4))
     from src.climode import get_model, get_inputs
+    args.batch_size = 10
 elif args.model == "cosmoflow":
     from src.cosmoflow import get_model, get_inputs
-    batch_sizes = list(range(2, 50, 8))
+    batch_sizes = list(range(1, 60, 2))
+    args.batch_size = 64
 elif args.model == "sam":
     from src.sam import get_model, get_inputs
-    batch_sizes = list(range(2, 20, 2))
+    batch_sizes = list(range(1, 20, 1))
     args.batch_size = 10
+elif args.model == "simmim":
+    from src.simmim import get_model, get_inputs
+    batch_sizes = list(range(1, 30, 1))
+    args.batch_size = 4
 else:
     raise ValueError(f"Model {args.model} not supported")
 
@@ -167,20 +174,21 @@ if __name__ == "__main__":
         from utils import read_from_file, plot_data_twinx
 
         model = get_model()
-        model.batch_aggregate = True
-        model.mini_batch = 4
+        model.batch_aggregate = args.batch_aggregate
+        model.mini_batch = args.mini_batch
         # model = torch.compile(model)
         results = batch_profile(args, model, batch_sizes, [1])
-        file_name = log_results(results, args.model+'-'+args.backend+'-'+args.hardware)
+        save_name = f"{args.model}-{args.backend}-{args.hardware}-{args.mode}-train_{args.is_training}-bz{args.batch_size}-bagg_{args.batch_aggregate}-mb_{args.mini_batch}"
+        file_name = log_results(results, save_name)
         memory_table, throughput_table, batch_sizes, stream_nums = read_from_file(file_name)
         plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
-        save_name=args.model+'-'+args.backend+'-'+args.hardware+'-train', x_axis="batch")
+        save_name=save_name, x_axis="batch")
     else:
         model = get_model()
-        model.batch_aggregate = args.batch_aggregate
         model.batch_cat_aggregate = args.batch_cat_aggregate
+        model.batch_aggregate = args.batch_aggregate
         model.mini_batch = args.mini_batch
         # model = torch.compile(model)
         single_profile(args, model)
-        
+
     # check_gradients(args, model)

@@ -4,6 +4,7 @@ import time
 import os
 import shutil
 import torch
+from torch.utils.checkpoint import checkpoint_sequential
 from pprint import pprint
 
 def read_from_file(file_path):
@@ -145,7 +146,7 @@ def log_results(results, save_name):
     # log the results using table format but in txt file
     # write memory table first, using stream_num as row, batch_size as column
     batch_sizes = sorted(batch_size_results.keys())
-    file_name = f"./logs/{save_name}-{time.strftime('%Y-%m-%d-%H-%M-%S')}.txt"
+    file_name = f"./logs/{save_name}.txt"
     with open(file_name, "w") as f:
         f.write("Memory Table\n")
         f.write("Stream Num\\Batch Size | " + " | ".join(map(str, batch_sizes)) + "\n")
@@ -196,6 +197,21 @@ def clean_cuda_cache():
     torch.cuda.reset_peak_memory_stats()
     torch.cuda.synchronize()
     print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**3:.4g} GB")
+
+
+def micro_batch(input, fn, batch_size, mini_batch, use_checkpoint=False):
+    mini_batch_size = max(1, batch_size // mini_batch)
+    output = []
+    for i in range(mini_batch_size):
+        start = i * mini_batch
+        end = min((i+1) * mini_batch, batch_size)
+        if use_checkpoint:
+            x_i = checkpoint_sequential(fn, len(fn), input[start:end, :, :], use_reentrant=True)
+        else:
+            x_i = fn(input[start:end, :, :])    
+        output.append(x_i)
+    x = torch.cat(output, dim=0)
+    return x
 
 
 if __name__ == "__main__":

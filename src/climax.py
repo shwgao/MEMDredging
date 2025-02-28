@@ -323,18 +323,18 @@ class ClimaX(nn.Module):
             id = var_ids[i]
             embeds.append(self.token_embeds[id](x[:, i : i + 1].contiguous()))  # B, 1, L, D
         
-        if not self.batch_cat_aggregate:
+        if not self.batch_aggregate:
             x = torch.stack(embeds, dim=1)  # B, V, L, D
             # x = fused_stack_add.forward(embeds, var_embed, 1)  # B, V, L, D
             
             x = x + var_embed.unsqueeze(2)  # B, V, L, D
             # x += var_embed.unsqueeze(2)  # B, V, L, D
             
-            # variable aggregation
-            if self.batch_aggregate:
-                x = self.batch_aggregate_variables(x, batch_size=self.mini_batch)  # B, L, D
-            else:
-                x = self.aggregate_variables(x)  # B, L, D
+            # # variable aggregation
+            # if self.batch_aggregate:
+            #     x = self.batch_aggregate_variables(x, batch_size=self.mini_batch)  # B, L, D
+            # else:
+            x = self.aggregate_variables(x)  # B, L, D
         else:
             x = self.batched_cat_aggregate(embeds, var_embed, batch_size=self.mini_batch)  # B, L, D
         
@@ -382,13 +382,18 @@ class ClimaX(nn.Module):
         preds = self.unpatchify(preds)
         out_var_ids = self.get_var_ids(tuple(self.out_variables), preds.device)
         preds = preds[:, out_var_ids]
+        
+        loss = 0.0  
 
-        if metrics is None:
-            loss = None
+        if self.training:
+            if metrics is None:
+                loss = None
+            else:
+                loss = [m(preds, y, self.out_variables, self.lat) for m in metrics]
+
+            return loss[0]['loss']
         else:
-            loss = [m(preds, y, self.out_variables, self.lat) for m in metrics]
-
-        return loss[0]['loss']
+            return preds
 
 
 class ModelConfigGlobal:

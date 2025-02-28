@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-
+import math
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
@@ -10,6 +10,20 @@ def pair(t):
     return t if isinstance(t, tuple) else (t, t)
 
 # classes
+
+def micro_batch_Attention(x, fn):
+    batch_size = x.shape[0]
+    mini_batch = 4
+    mini_batch_size = math.ceil(batch_size / mini_batch)
+    output = []
+    for i in range(mini_batch_size):
+        start = i * mini_batch
+        end = min((i+1) * mini_batch, batch_size)
+        x_i = fn(x[start:end, :, :])
+        output.append(x_i)
+    x = torch.cat(output, dim=0)
+    return x
+
 
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout = 0.):
@@ -73,11 +87,16 @@ class Transformer(nn.Module):
                 FeedForward(dim, mlp_dim, dropout = dropout)
             ]))
 
+    # def forward(self, x):
+    #     for attn, ff in self.layers:
+    #         x = attn(x) + x
+    #         x = ff(x) + x
+
+    #     return self.norm(x)
     def forward(self, x):
         for attn, ff in self.layers:
-            x = attn(x) + x
+            x = micro_batch_Attention(x, attn) + x
             x = ff(x) + x
-
         return self.norm(x)
 
 class ViT(nn.Module):

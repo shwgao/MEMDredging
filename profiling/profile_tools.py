@@ -79,17 +79,13 @@ class ModelProfiler:
             ) as p:
                 if not self.is_training:
                     with torch.no_grad():
-                        for i in range(10):
-                            p.step()
-                            if i >= wait + warmup + active:
-                                break
+                        for i in range(wait + warmup + active):
                             self._compute(input_data)
+                            p.step()
                 else:
-                    for i in range(10):
-                        p.step()
-                        if i >= wait + warmup + active:
-                            break
+                    for i in range(wait + warmup + active):
                         self._compute(input_data)
+                        p.step()
 
     def dump_snapshot(self, input_data, save_name):
         if not os.path.exists(f"{self.save_dir}/{save_name}"):

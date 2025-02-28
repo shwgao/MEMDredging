@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from einops import repeat
+from src.vit import ViT
+
 
 class SimMIM(nn.Module):
     def __init__(
@@ -86,10 +88,35 @@ class SimMIM(nn.Module):
         recon_loss = F.l1_loss(pred_pixel_values, masked_patches) / num_masked
         return recon_loss
 
+def get_model():
+    # return model
+    
+    v = ViT(
+        image_size = 2048,
+        patch_size = 32,
+        num_classes = 1000,
+        dim = 1024,
+        depth = 6,
+        heads = 8,
+        mlp_dim = 2048
+    )
+
+    model = SimMIM(
+        encoder = v,
+        masking_ratio = 0.5  # they found 50% to yield the best results
+    )
+    return model
+
+def get_inputs(batch_size):
+    # create example data
+    inputs = torch.randn(batch_size, 3, 2048, 2048, dtype=torch.float32)
+    batch_index = [0]
+    is_batched = True
+    return (inputs,), batch_index, is_batched
 
 if __name__ == "__main__":
     import torch
-    from vit import ViT
+    
 
     v = ViT(
         image_size = 2048,
@@ -108,7 +135,7 @@ if __name__ == "__main__":
 
     mim = mim.to('cuda')
 
-    images = torch.randn(8, 3, 2048, 2048).to('cuda')
+    images = torch.randn(2, 3, 2048, 2048).to('cuda')
 
     loss = mim(images)
     loss.backward()

@@ -282,7 +282,7 @@ def log(t, eps = 1e-20):
 
 
 def micro_batch(input, fn, batch_size, mini_batch):
-    mini_batch_size = max(1, batch_size // mini_batch)
+    mini_batch_size = math.ceil(batch_size / mini_batch)
     output = []
     for i in range(mini_batch_size):
         start = i * mini_batch
