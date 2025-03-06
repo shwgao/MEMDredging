@@ -50,11 +50,13 @@ file_name2 = 'logs/enformer-pytorch-V100-eager-train_False-bz59-bagg_False-mb_4.
 
 memory_table1, throughput_table1, batch_sizes1, stream_nums1 = read_from_file(file_name1)
 memory_table2, throughput_table2, batch_sizes2, stream_nums2 = read_from_file(file_name2)
-memory_table1 = [memory_table1, [batch_sizes1]]
-memory_table2 = [memory_table2, [batch_sizes2]]
-memory_tables = [memory_table1, memory_table2]
-throughput_table1 = [throughput_table1, [batch_sizes1]]
-throughput_table2 = [throughput_table2, [batch_sizes2]]
-throughput_tables = [throughput_table1, throughput_table2]
+memory_tables = [
+    [memory_table1, [batch_sizes1]], 
+    [memory_table2, [batch_sizes2]]
+]
+throughput_tables = [
+    [throughput_table1, [batch_sizes1]],
+    [throughput_table2, [batch_sizes2]] 
+]
 
 plot_data_twinx(memory_tables, throughput_tables, legends=['microbatch', 'original'], save_name="enformer-pytorch-V100-compare")

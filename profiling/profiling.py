@@ -22,10 +22,6 @@ torch.manual_seed(42)
 def single_profile(args, model):    
     inputs, batch_index, is_batched = get_inputs(args.batch_size)
     
-    export_model = export(model, inputs)
-    print(export_model)
-    return export_model
-    
     if args.is_training:
         model.train()
     else:
@@ -117,15 +113,15 @@ def check_gradients(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="enformer", help="")
+parser.add_argument("--model", type=str, default="cosmoflow", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
-parser.add_argument("--is_training", type=bool, default=True)
-parser.add_argument("--batch_profile", type=bool, default=False)
+parser.add_argument("--is_training", type=bool, default=False)
+parser.add_argument("--batch_profile", type=bool, default=True)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
 parser.add_argument("--torch_profiling", type=bool, default=False)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
@@ -156,7 +152,7 @@ elif args.model == "cosmoflow":
 elif args.model == "sam":
     from src.sam import get_model, get_inputs
     batch_sizes = list(range(1, 20, 1))
-    args.batch_size = 10
+    args.batch_size = 3
 elif args.model == "simmim":
     from src.simmim import get_model, get_inputs
     batch_sizes = list(range(1, 30, 1))
@@ -176,19 +172,17 @@ if __name__ == "__main__":
         model = get_model()
         model.batch_aggregate = args.batch_aggregate
         model.mini_batch = args.mini_batch
-        # model = torch.compile(model)
+        model = torch.compile(model)
         results = batch_profile(args, model, batch_sizes, [1])
         save_name = f"{args.model}-{args.backend}-{args.hardware}-{args.mode}-train_{args.is_training}-bz{args.batch_size}-bagg_{args.batch_aggregate}-mb_{args.mini_batch}"
         file_name = log_results(results, save_name)
-        memory_table, throughput_table, batch_sizes, stream_nums = read_from_file(file_name)
-        plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
-        save_name=save_name, x_axis="batch")
+        # memory_table, throughput_table, batch_sizes, stream_nums = read_from_file(file_name)
+        # plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
+        # save_name=save_name, x_axis="batch")
     else:
         model = get_model()
         model.batch_cat_aggregate = args.batch_cat_aggregate
         model.batch_aggregate = args.batch_aggregate
         model.mini_batch = args.mini_batch
-        # model = torch.compile(model)
+        model = torch.compile(model)
         single_profile(args, model)
-
-    # check_gradients(args, model)

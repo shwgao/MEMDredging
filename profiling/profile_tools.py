@@ -7,6 +7,7 @@ import time
 import numpy as np
 from torch.utils.data import DataLoader
 from DaYu.asyncPipelineModel import AsyncPipelineModel
+from torch.profiler import ExecutionTraceObserver
 
 from pynvml import nvmlInit, nvmlDeviceGetMemoryInfo, nvmlDeviceGetHandleByIndex
 
@@ -64,7 +65,7 @@ class ModelProfiler:
             print(f"Output mismatch, Output difference (max): {torch.max(torch.abs(output1 - output2))}")
         return True
     
-    def torch_profiling(self, input_data, save_name, wait=0, warmup=0, active=3):
+    def torch_profiling(self, input_data, save_name, wait=1, warmup=1, active=3):
         with torch.profiler.profile(
                 activities=[
                     torch.profiler.ProfilerActivity.CPU,
@@ -75,7 +76,10 @@ class ModelProfiler:
                 profile_memory=True,
                 with_stack=True,
                 with_modules=True,
-                on_trace_ready=torch.profiler.tensorboard_trace_handler(f'{save_name}'),
+                on_trace_ready=torch.profiler.tensorboard_trace_handler(f'{save_name}/tensorboard.pt.trace.json'),
+                execution_trace_observer=(
+                    ExecutionTraceObserver().register_callback(f"{save_name}/execution_trace.json")
+                ),
             ) as p:
                 if not self.is_training:
                     with torch.no_grad():
@@ -250,7 +254,7 @@ class ModelProfiler:
             'memory': mean_memory,
             'throughput': throughput
         }
-        
+
 
 
 class ModelWrapper(torch.nn.Module):
