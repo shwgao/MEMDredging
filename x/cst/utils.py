@@ -8,9 +8,14 @@ import time
 from contextlib import contextmanager
 from math import pow
 import numpy as np
+import re
 
-from . import consts
+PLUGIN_NAME = 'pytorch_profiler'
 
+WORKER_PATTERN = re.compile(r"""^(.*?) # worker name
+        (\.\d+)? # optional timestamp like 1619499959628 used as span name
+        \.pt\.trace\.json # the ending suffix
+        (?:\.gz)?$""", re.X)  # optional .gz extension
 
 def get_logging_level():
     log_level = os.environ.get('TORCH_PROFILER_LOG_LEVEL', 'INFO').upper()
@@ -25,13 +30,13 @@ logger = None
 def get_logger():
     global logger
     if logger is None:
-        logger = logging.getLogger(consts.PLUGIN_NAME)
+        logger = logging.getLogger(PLUGIN_NAME)
         logger.setLevel(get_logging_level())
     return logger
 
 
 def is_chrome_trace_file(path):
-    return consts.WORKER_PATTERN.match(path)
+    return WORKER_PATTERN.match(path)
 
 
 def href(text, url):
