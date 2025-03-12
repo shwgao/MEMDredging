@@ -11,9 +11,8 @@ def pair(t):
 
 # classes
 
-def micro_batch_Attention(x, fn):
+def micro_batch_Attention(x, fn, mini_batch):
     batch_size = x.shape[0]
-    mini_batch = 4
     mini_batch_size = math.ceil(batch_size / mini_batch)
     output = []
     for i in range(mini_batch_size):
@@ -93,9 +92,12 @@ class Transformer(nn.Module):
     #         x = ff(x) + x
 
     #     return self.norm(x)
-    def forward(self, x):
+    def forward(self, x, batch_aggregate, mini_batch):
         for attn, ff in self.layers:
-            x = micro_batch_Attention(x, attn) + x
+            if batch_aggregate:
+                x = micro_batch_Attention(x, attn, mini_batch) + x
+            else:
+                x = attn(x) + x
             x = ff(x) + x
         return self.norm(x)
 

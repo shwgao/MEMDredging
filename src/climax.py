@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from timm.models.vision_transformer import Block, PatchEmbed, trunc_normal_
+from torch.utils.checkpoint import checkpoint_sequential, checkpoint
 
 EMBEDDING_ONLY = False
 
@@ -136,7 +137,8 @@ class ClimaX(nn.Module):
         self.batch_cat_aggregate = False
         self.batch_aggregate = False
         self.mini_batch = 8
-
+        self.checkpointing = False
+        
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             trunc_normal_(m.weight, std=0.02)
@@ -204,14 +206,11 @@ class ClimaX(nn.Module):
         x = torch.einsum("bvld->blvd", x)
         x = x.flatten(0, 1)  # BxL, V, D
         
-        # print(f"x.device: {x.device}")
-        # print(f"self.var_query.device: {self.var_query.device}")
         var_query = self.var_query.repeat_interleave(x.shape[0], dim=0)
         
         x, _ = self.var_agg(var_query, x, x, need_weights=False)  # BxL, D # pass need_weights=False to save computation x = self.var_agg(var_query, x, x, need_weights=False)  # BxL, D
         
         x = x.squeeze()
-
         x = x.unflatten(dim=0, sizes=(b, l))  # B, L, D
         return x
     
@@ -334,7 +333,10 @@ class ClimaX(nn.Module):
             # if self.batch_aggregate:
             #     x = self.batch_aggregate_variables(x, batch_size=self.mini_batch)  # B, L, D
             # else:
-            x = self.aggregate_variables(x)  # B, L, D
+            if self.checkpointing:
+                x = checkpoint(self.aggregate_variables, x)
+            else:
+                x = self.aggregate_variables(x)  # B, L, D
         else:
             x = self.batched_cat_aggregate(embeds, var_embed, batch_size=self.mini_batch)  # B, L, D
         
@@ -355,8 +357,11 @@ class ClimaX(nn.Module):
             # x = x.to('cuda:2')
 
         # apply Transformer blocks
-        for blk in self.blocks:
-            x = blk(x)
+        if self.checkpointing:
+            x = checkpoint_sequential(self.blocks, len(self.blocks), x)
+        else:
+            for blk in self.blocks:
+                x = blk(x)
         x = self.norm(x)
 
         return x

@@ -45,8 +45,8 @@ def plot_data_twinx(memory_tables, throughput_tables, legends, save_name=""):
     plt.tight_layout()
     plt.savefig(f"./logs/{save_name}.png")
 
-file_name1 = 'logs/enformer-pytorch-V100-eager-train_False-bz11-bagg_True-mb_2.txt'
-file_name2 = 'logs/enformer-pytorch-V100-eager-train_False-bz59-bagg_False-mb_4.txt'
+file_name1 = 'logs/simmim/pytorch-RTX8000-eager-train_False-bz29-bagg_True-mb_4.txt'
+file_name2 = 'logs/simmim/pytorch-RTX8000-eager-train_False-bz29-bagg_False-mb_4.txt'
 
 memory_table1, throughput_table1, batch_sizes1, stream_nums1 = read_from_file(file_name1)
 memory_table2, throughput_table2, batch_sizes2, stream_nums2 = read_from_file(file_name2)
@@ -59,4 +59,4 @@ throughput_tables = [
     [throughput_table2, [batch_sizes2]] 
 ]
 
-plot_data_twinx(memory_tables, throughput_tables, legends=['microbatch', 'original'], save_name="enformer-pytorch-V100-compare")
+plot_data_twinx(memory_tables, throughput_tables, legends=['microbatch', 'original'], save_name="simmim/pytorch-RTX8000-compare")

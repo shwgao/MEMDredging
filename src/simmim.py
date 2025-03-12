@@ -10,15 +10,18 @@ class SimMIM(nn.Module):
         self,
         *,
         encoder,
-        masking_ratio = 0.5
+        masking_ratio = 0.5,
     ):
         super().__init__()
         assert masking_ratio > 0 and masking_ratio < 1, 'masking ratio must be kept between 0 and 1'
         self.masking_ratio = masking_ratio
 
         # extract some hyperparameters and functions from encoder (vision transformer to be trained)
+        self.batch_aggregate = False
+        self.mini_batch = 4
 
         self.encoder = encoder
+        
         num_patches, encoder_dim = encoder.pos_embedding.shape[-2:]
 
         self.to_patch = encoder.to_patch_embedding[0]
@@ -69,7 +72,7 @@ class SimMIM(nn.Module):
 
         # attend with vision transformer
 
-        encoded = self.encoder.transformer(tokens)
+        encoded = self.encoder.transformer(tokens, self.batch_aggregate, self.mini_batch)
 
         # get the masked tokens
 

@@ -143,15 +143,15 @@ class Enformer(PreTrainedModel):
 
         # create trunk sequential module
 
-        # self._trunk = nn.Sequential(
-        #     Rearrange('b n d -> b d n'),
-        #     self.stem,
-        #     self.conv_tower,
-        #     Rearrange('b d n -> b n d'),
-        #     self.transformer,
-        #     self.crop_final,
-        #     self.final_pointwise
-        # )
+        self._trunk = nn.Sequential(
+            Rearrange('b n d -> b d n'),
+            self.stem,
+            self.conv_tower,
+            Rearrange('b d n -> b n d'),
+            self.transformer,
+            self.crop_final,
+            self.final_pointwise
+        )
 
         # create final heads for human and mouse
 
@@ -159,9 +159,10 @@ class Enformer(PreTrainedModel):
 
         # use checkpointing on transformer trunk
 
-        self.use_checkpointing = config.use_checkpointing
+        self.checkpointing = False
         
         self.batch_aggregate = False
+        self.mini_batch = 2
 
     def add_heads(self, **kwargs):
         self.output_heads = kwargs
@@ -219,27 +220,27 @@ class Enformer(PreTrainedModel):
             self.set_target_length(target_length)
 
         # original
-        # trunk_fn = self.trunk_checkpointed if self.use_checkpointing else self._trunk
-        # x = trunk_fn(x)
+        trunk_fn = self.trunk_checkpointed if self.checkpointing else self._trunk
+        x = trunk_fn(x)
         
-        # my implementation
-        x = rearrange(x, 'b n d -> b d n')
-        if self.batch_aggregate:
-            # split the batch into mini-batches
-            fn = nn.Sequential(self.stem, self.conv_tower[0], self.conv_tower[1])
-            x = micro_batch(x, fn, x.shape[0], self.mini_batch)
-            # x = micro_batch(x, self.stem, x.shape[0], self.mini_batch)
-            # x = micro_batch(x, self.conv_tower[0], x.shape[0], self.mini_batch)
-            for i in range(2, len(self.conv_tower)):
-                x = self.conv_tower[i](x)
-        else:
-            x = self.stem(x)
-            x = self.conv_tower(x)
+        # # my implementation
+        # x = rearrange(x, 'b n d -> b d n')
+        # if self.batch_aggregate:
+        #     # split the batch into mini-batches
+        #     fn = nn.Sequential(self.stem, self.conv_tower[0], self.conv_tower[1])
+        #     x = micro_batch(x, fn, x.shape[0], self.mini_batch)
+        #     # x = micro_batch(x, self.stem, x.shape[0], self.mini_batch)
+        #     # x = micro_batch(x, self.conv_tower[0], x.shape[0], self.mini_batch)
+        #     for i in range(2, len(self.conv_tower)):
+        #         x = self.conv_tower[i](x)
+        # else:
+        #     x = self.stem(x)
+        #     x = self.conv_tower(x)
         
-        x = rearrange(x, 'b d n -> b n d')
-        x = checkpoint_sequential(self.transformer, len(self.transformer), x, use_reentrant=True) if self.use_checkpointing else self.transformer(x)
-        x = self.crop_final(x)
-        x = self.final_pointwise(x)
+        # x = rearrange(x, 'b d n -> b n d')
+        # x = checkpoint_sequential(self.transformer, len(self.transformer), x, use_reentrant=True) if self.checkpointing else self.transformer(x)
+        # x = self.crop_final(x)
+        # x = self.final_pointwise(x)
 
         if no_batch:
             x = rearrange(x, '() ... -> ...')
@@ -287,8 +288,8 @@ def micro_batch(input, fn, batch_size, mini_batch):
     for i in range(mini_batch_size):
         start = i * mini_batch
         end = min((i+1) * mini_batch, batch_size)
-        # x_i = fn(input[start:end, :, :])
-        x_i = checkpoint_sequential(fn, len(fn), input[start:end, :, :], use_reentrant=True)
+        x_i = fn(input[start:end, :, :])
+        # x_i = checkpoint_sequential(fn, len(fn), input[start:end, :, :], use_reentrant=True)
         output.append(x_i)
     x = torch.cat(output, dim=0)
     return x
