@@ -19,7 +19,8 @@ class SimMIM(nn.Module):
         # extract some hyperparameters and functions from encoder (vision transformer to be trained)
         self.batch_aggregate = False
         self.mini_batch = 4
-
+        self.checkpointing = False
+        
         self.encoder = encoder
         
         num_patches, encoder_dim = encoder.pos_embedding.shape[-2:]
@@ -72,7 +73,7 @@ class SimMIM(nn.Module):
 
         # attend with vision transformer
 
-        encoded = self.encoder.transformer(tokens, self.batch_aggregate, self.mini_batch)
+        encoded = self.encoder.transformer(tokens, self.batch_aggregate, self.mini_batch, self.checkpointing)
 
         # get the masked tokens
 

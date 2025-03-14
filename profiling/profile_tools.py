@@ -77,9 +77,9 @@ class ModelProfiler:
                 with_stack=True,
                 with_modules=True,
                 on_trace_ready=torch.profiler.tensorboard_trace_handler(f'{save_name}/tensorboard.pt.trace.json'),
-                execution_trace_observer=(
-                    ExecutionTraceObserver().register_callback(f"{save_name}/execution_trace.json")
-                ),
+                # execution_trace_observer=(
+                #     ExecutionTraceObserver().register_callback(f"{save_name}/execution_trace.json")
+                # ),
             ) as p:
                 if not self.is_training:
                     with torch.no_grad():
@@ -94,11 +94,16 @@ class ModelProfiler:
     def dump_snapshot(self, input_data, save_name):
         if not os.path.exists(f"{self.save_dir}/{save_name}"):
             os.makedirs(f"{self.save_dir}/{save_name}")
-        with torch.no_grad():
-            torch.cuda.empty_cache()
-            torch.cuda.memory._record_memory_history()
-            self.wrapped_model(input_data)
-            torch.cuda.memory._dump_snapshot(f"{self.save_dir}/{save_name}/{save_name}-{time.strftime('%Y-%m-%d-%H-%M-%S')}.pickle")
+        
+        torch.cuda.empty_cache()
+        torch.cuda.memory._record_memory_history()
+        if not self.is_training:    
+            with torch.no_grad():
+                # self.wrapped_model(input_data)
+                self._compute(input_data)
+        else:
+            self._compute(input_data)
+        torch.cuda.memory._dump_snapshot(f"{self.save_dir}/{save_name}/{save_name}-{time.strftime('%Y-%m-%d-%H-%M-%S')}.pickle")
 
     def dump_onnx_graph(self, input_data, save_name):
         # move everything to cpu avoiding different devices issues
@@ -120,7 +125,7 @@ class ModelProfiler:
     def _compute(self, data):
         if self.is_training:
             self.optimizer.zero_grad()
-            
+        
         loss = self.model(*data)
         
         if self.is_training:

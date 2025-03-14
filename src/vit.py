@@ -3,6 +3,7 @@ from torch import nn
 import math
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
+from torch.utils.checkpoint import checkpoint
 
 # helpers
 
@@ -11,14 +12,17 @@ def pair(t):
 
 # classes
 
-def micro_batch_Attention(x, fn, mini_batch):
+def micro_batch_Attention(x, fn, mini_batch, checkpointing=False):
     batch_size = x.shape[0]
     mini_batch_size = math.ceil(batch_size / mini_batch)
     output = []
     for i in range(mini_batch_size):
         start = i * mini_batch
         end = min((i+1) * mini_batch, batch_size)
-        x_i = fn(x[start:end, :, :])
+        if checkpointing:
+            x_i = checkpoint(fn, x[start:end, :, :])
+        else:
+            x_i = fn(x[start:end, :, :])
         output.append(x_i)
     x = torch.cat(output, dim=0)
     return x
@@ -92,12 +96,16 @@ class Transformer(nn.Module):
     #         x = ff(x) + x
 
     #     return self.norm(x)
-    def forward(self, x, batch_aggregate, mini_batch):
+    
+    def forward(self, x, batch_aggregate, mini_batch, checkpointing=False):
         for attn, ff in self.layers:
             if batch_aggregate:
-                x = micro_batch_Attention(x, attn, mini_batch) + x
+                x = micro_batch_Attention(x, attn, mini_batch, checkpointing) + x
             else:
-                x = attn(x) + x
+                if checkpointing:
+                    x = checkpoint(attn, x) + x
+                else:
+                    x = attn(x) + x
             x = ff(x) + x
         return self.norm(x)
 

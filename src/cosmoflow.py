@@ -62,7 +62,7 @@ class CosmoFlow(nn.Module):
             self.conv_seq.append(Conv3DActMP(input_channel_size, output_channel_size))
             input_channel_size = output_channel_size
         
-        self.conv_seq = nn.Sequential(*self.conv_seq)
+        # self.conv_seq = nn.Sequential(*self.conv_seq)
 
         flatten_inputs = 128 // (2 ** 5)
         flatten_inputs = (flatten_inputs ** 3) * input_channel_size
@@ -86,13 +86,23 @@ class CosmoFlow(nn.Module):
                 
         self.batch_aggregate = False
         self.mini_batch = 4
+        self.checkpointing = False
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.batch_aggregate:
-            x = micro_batch(x, self.conv_seq, x.shape[0], self.mini_batch)
+            # x = micro_batch(x, nn.Sequential(self.conv_seq[0], self.conv_seq[1]), x.shape[0], self.mini_batch, self.checkpointing)
+            x = micro_batch(x, nn.Sequential(*self.conv_seq), x.shape[0], self.mini_batch, self.checkpointing)
+            
+            # for i in range(2, len(self.conv_seq)):
+            #     x = self.conv_seq[i](x)
         else:
-            for i, conv_layer in enumerate(self.conv_seq):
-                x = conv_layer(x)
+            # for i, conv_layer in enumerate(self.conv_seq):
+            #     x = conv_layer(x)
+            if self.checkpointing:
+                x = checkpoint_sequential(self.conv_seq, len(self.conv_seq), x, use_reentrant=True)
+            else:
+                for conv_layer in self.conv_seq:
+                    x = conv_layer(x)
 
         x = x.permute(0, 2, 3, 4, 1).flatten(1)
 
@@ -107,7 +117,6 @@ def get_model():
     model = CosmoFlow()
     return model
 
-
 def get_inputs(batch_size):
     x = torch.randn(batch_size, 4, 128, 128, 128)
     target = torch.randn(batch_size, 4)
@@ -119,11 +128,13 @@ class ModelWrapper(torch.nn.Module):
     super().__init__()
     self.model = CosmoFlow()
     self.batch_aggregate = False
-    self.mini_batch = 4
+    self.mini_batch = 8
+    self.checkpointing = False
     
   def forward(self, inputs, target):
     self.model.batch_aggregate = self.batch_aggregate
     self.model.mini_batch = self.mini_batch
+    self.model.checkpointing = self.checkpointing
     outputs = self.model(inputs)
     loss = self.compute_loss(outputs, target)
     return loss

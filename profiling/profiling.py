@@ -54,7 +54,7 @@ def single_profile(args, model):
     clean_cuda_cache()
 
     if args.torch_profiling:
-        save_name = 'logs/' + args.model + '/' + args.mode + f'train_{args.is_training}-bz{args.batch_size}-{args.hardware}-bagg_{args.batch_aggregate}-mb_{args.mini_batch}'
+        save_name = 'logs/' + args.model + '/' + args.mode + f'train_{args.is_training}-bz{args.batch_size}-{args.hardware}-bagg_{args.batch_aggregate}-mb_{args.mini_batch}-check_{args.checkpointing}'
         overwrite_dir(save_name)
         profiler.torch_profiling(data_loader, save_name, wait=1, warmup=1, active=3)
     
@@ -139,7 +139,7 @@ def check_gradients(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="enformer", help="")
+parser.add_argument("--model", type=str, default="simmim", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=32)
@@ -151,11 +151,11 @@ parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
 parser.add_argument("--torch_profiling", type=bool, default=False)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
-parser.add_argument("--hardware", type=str, default="RTX8000", help="V100, A100")
+parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
 parser.add_argument("--batch_cat_aggregate", type=bool, default=False, help="Only useful for climax")
-parser.add_argument("--batch_aggregate", type=bool, default=False)
-parser.add_argument("--mini_batch", type=int, default=8)
-parser.add_argument("--checkpointing", type=bool, default=False)
+parser.add_argument("--batch_aggregate", type=bool, default=True)
+parser.add_argument("--mini_batch", type=int, default=4)
+parser.add_argument("--checkpointing", type=bool, default=True)
 
 args = parser.parse_args()
 
@@ -183,7 +183,7 @@ elif args.model == "sam":
 elif args.model == "simmim":
     from src.simmim import get_model, get_inputs
     batch_sizes = list(range(1, 30, 1))
-    args.batch_size = 32
+    args.batch_size = 8
 else:
     raise ValueError(f"Model {args.model} not supported")
 
@@ -213,5 +213,5 @@ if __name__ == "__main__":
         model.batch_aggregate = args.batch_aggregate
         model.mini_batch = args.mini_batch
         model.checkpointing = args.checkpointing
-        model = torch.compile(model)
+        # model = torch.compile(model)
         single_profile(args, model)

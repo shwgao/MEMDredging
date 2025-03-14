@@ -358,7 +358,7 @@ class ClimaX(nn.Module):
 
         # apply Transformer blocks
         if self.checkpointing:
-            x = checkpoint_sequential(self.blocks, len(self.blocks), x)
+            x = checkpoint_sequential(nn.Sequential(*self.blocks), len(self.blocks), x, use_reentrant=True)
         else:
             for blk in self.blocks:
                 x = blk(x)
