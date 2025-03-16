@@ -1,6 +1,7 @@
 import torch
 import monai
-from transformers import SamModel, SamProcessor
+from sam_modeling import SamModel
+from transformers import SamProcessor
 
 seg_loss = monai.losses.DiceCELoss(sigmoid=True, squared_pred=True, reduction='mean')
 
@@ -46,7 +47,7 @@ def get_inputs(batch_size):
 
 if __name__ == "__main__":
     model = get_model()
-    inputs, ground_truth_masks = get_inputs(10)  # Unpack the tuple
+    inputs, ground_truth_masks, _ = get_inputs(10)  # Unpack the tuple
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
     inputs = {k: v.to(device) for k, v in inputs.items()}  # Move each input tensor to device

@@ -25,6 +25,11 @@ import torch.nn.functional as F
 import torch.utils.checkpoint
 from torch import Tensor, nn
 
+from sam_utils import *
+from transformers.utils import ModelOutput, add_start_docstrings, add_start_docstrings_to_model_forward, logging
+from transformers.modeling_utils import PreTrainedModel
+from transformers.modeling_outputs import BaseModelOutput
+
 # from ...activations import ACT2FN
 # from ...modeling_outputs import BaseModelOutput
 # from ...modeling_utils import PreTrainedModel
