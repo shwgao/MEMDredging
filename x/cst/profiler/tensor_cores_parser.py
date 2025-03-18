@@ -3,7 +3,7 @@
 # -------------------------------------------------------------------------
 from typing import Dict, Iterable, List
 
-from cst.profiler import consts
+from . import consts
 from .node import OperatorNode
 
 

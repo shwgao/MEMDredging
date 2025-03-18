@@ -3,7 +3,7 @@
 # --------------------------------------------------------------------------
 from typing import Iterable, List
 
-from cst.profiler import consts
+from . import consts
 from ..import utils
 from .range_utils import (get_ranges_sum, intersection_ranges_lists,
                           intersection_ranges_lists_with_value, merge_ranges,

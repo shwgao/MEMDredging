@@ -9,8 +9,8 @@ from collections import defaultdict
 from typing import List, Tuple
 
 from cst import consts, io, utils
-from ..multiprocessing import Process, Queue
-from ..run import Run, RunProfile
+from multiprocessing import Process, Queue
+# from ..run import Run, RunProfile
 from .data import DistributedRunProfileData, RunProfileData
 from .node import CommunicationNode
 from .run_generator import DistributedRunGenerator, RunGenerator

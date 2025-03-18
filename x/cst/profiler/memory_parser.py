@@ -5,12 +5,9 @@ from collections import defaultdict
 from enum import IntEnum
 from typing import Dict, Iterable, List, Optional, Tuple
 
-from .. import utils
 from .node import OperatorNode, is_operator_node
 from .op_agg import aggregate_ops
 from .trace import DeviceType, MemoryEvent
-
-logger = utils.get_logger()
 
 
 class MemoryMetrics(IntEnum):
@@ -121,7 +118,7 @@ class MemorySnapshot:
                         memory_metrics_keyed_by_node[node][device][i] = value
                         memory_metrics_keyed_by_node[node][device][i + self_metric_length] += value
             else:
-                logger.debug('node {}:{} is not operator node, will skip its self metrics processing'.format(
+                print('node {}:{} is not operator node, will skip its self metrics processing'.format(
                     node.name, node.start_time))
 
             # recursive the children nodes
@@ -227,7 +224,7 @@ class MemoryParser:
 
                 if current_node is None or current_node.start_time is None or current_node.end_time is None:
                     # 3. Ignore all remaining records.
-                    logger.debug(
+                    print(
                         'could not find the node for tid %d, timestamp: %d, record index: %d, total records: %d' % (
                             record.tid, record.ts, record_index, len(records)))
                     self.staled_records.append(records[record_index])
@@ -236,7 +233,7 @@ class MemoryParser:
 
                 if record.ts < current_node.start_time:
                     # this should only happens for root node.
-                    logger.debug('record timestamp %d is less that the start time of %s' %
+                    print('record timestamp %d is less that the start time of %s' %
                                  (record.ts, current_node.name))
                     # This record has no chance to be appended to following tree node.
                     self.staled_records.append(record)
@@ -293,10 +290,10 @@ class MemoryParser:
 
         # show summary information
         if len(self.staled_records) > 0 and len(self.memory_records) > 0:
-            logger.debug('{} memory records are skipped in total {} memory records and only {} get processed'.format(
+            print('{} memory records are skipped in total {} memory records and only {} get processed'.format(
                 len(self.staled_records), len(self.memory_records), len(self.processed_records)))
         if tree_height > 0:
-            logger.debug('max tree height is {}'.format(tree_height))
+            print('max tree height is {}'.format(tree_height))
 
         all_records = self.get_preprocessed_records()
         return MemorySnapshot(all_records, op_memory_table, processed_node)
