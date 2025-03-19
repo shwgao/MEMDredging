@@ -95,6 +95,13 @@ class RunProfileData:
 
         # recommendation based on analysis result.
         self.recommendations = []
+        
+        # data_clean
+        self.clean_root_node = None
+        self.clean_events = []
+        self.clean_tid2tree = {}
+        self.clean_profiler_start_ts = -1
+        self.clean_memory_snapshot: Optional[MemorySnapshot] = None
 
     @staticmethod
     def parse(worker, span, path, cache_dir):
@@ -312,6 +319,11 @@ class RunProfileData:
         memory_events = [e for e in self.events if e.type == EventTypes.MEMORY]
         memory_events.sort(key=lambda e: e.ts)
         return memory_events
+    
+    def _clean_memory_events(self) -> List[MemoryEvent]:
+        memory_events = [e for e in self.clean_events if e.type == EventTypes.MEMORY]
+        memory_events.sort(key=lambda e: e.ts)
+        return memory_events
 
     def _analyze_gpu_metrics(self):
         def get_gpus_str(gpus):
@@ -335,22 +347,35 @@ class RunProfileData:
                    'may affect the speed and stability of model convergence.'.format(gpu_list_str, has_str)
             self.recommendations.append(text)
 
-
-class DistributedRunProfileData:
-    def __init__(self, run_profile_data: RunProfileData):
-        self.worker = run_profile_data.worker
-        self.span = run_profile_data.span
-        self.steps_names = run_profile_data.steps_names
-        self.has_communication = run_profile_data.has_communication
-        self.comm_lib = run_profile_data.comm_lib
-        self.comm_node_list = run_profile_data.comm_node_list
-        self.comm_overlap_costs = run_profile_data.comm_overlap_costs
-        self.used_devices = run_profile_data.used_devices
-        self.device_props = run_profile_data.device_props
-        self.distributed_info = run_profile_data.distributed_info
-
-        self.total_comm_stats = None
-        self.step_comm_stats = None
-
-    def communication_parse(self):
-        self.step_comm_stats, self.total_comm_stats = analyze_communication_nodes(self.comm_node_list)
+    def data_clean(self):
+        """
+        Clean the data in the profile, only keep the data that is after the last profiler step.
+        """
+        # find the last ProfilerStep start time
+        new_profiler_start_ts = 0
+        profiler_step = None
+        for e in self.events:
+            if isinstance(e, trace.ProfilerStepEvent):
+                new_profiler_start_ts = max(new_profiler_start_ts, e.ts)
+        
+        root_node = next(iter(self.tid2tree.values()))
+        
+        if 'ProfilerStep#' in root_node.children[-1].name:
+            self.clean_root_node = root_node.children[-2]
+        else:
+            self.clean_root_node = root_node.children[-1]
+            
+        ts = self.clean_root_node.start_time
+        te = self.clean_root_node.end_time
+        self.clean_events = [e for e in self.events if e.ts >= ts and e.ts <= te]
+        
+        # self.clean_profiler_start_ts = ts
+        
+        # self.clean_tid2tree
+        
+        # memory_events = self._clean_memory_events()
+        # if memory_events:
+        #     memory_parser = MemoryParser(memory_events)
+        #     self.clean_memory_snapshot = memory_parser.find_memory_nodes(self.clean_tid2tree)
+        
+        # self.forward_backward_events = self._clean_memory_events()

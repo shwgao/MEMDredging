@@ -139,7 +139,7 @@ def check_gradients(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="simmim", help="")
+parser.add_argument("--model", type=str, default="enformer", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=32)
@@ -149,13 +149,13 @@ parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument("--is_training", type=bool, default=True)
 parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
-parser.add_argument("--torch_profiling", type=bool, default=False)
+parser.add_argument("--torch_profiling", type=bool, default=True)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
 parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
 parser.add_argument("--batch_cat_aggregate", type=bool, default=False, help="Only useful for climax")
-parser.add_argument("--batch_aggregate", type=bool, default=True)
+parser.add_argument("--batch_aggregate", type=bool, default=False)
 parser.add_argument("--mini_batch", type=int, default=4)
-parser.add_argument("--checkpointing", type=bool, default=True)
+parser.add_argument("--checkpointing", type=bool, default=False)
 
 args = parser.parse_args()
 
@@ -167,7 +167,7 @@ if args.model == "climax":
 elif args.model == "enformer":
     from src.enformer import get_model, get_inputs
     batch_sizes = list(range(1, 12, 1))
-    args.batch_size = 4
+    args.batch_size = 2
 elif args.model == "climode": # seems not suitable for our work because of large portion of cpus computation
     batch_sizes = list(range(2, 100, 4))
     from src.climode import get_model, get_inputs
