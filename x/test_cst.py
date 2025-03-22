@@ -116,11 +116,40 @@ def hisgramm_event_types(profile):
     return event_types
 
 
+def event_distribution(trace_json):
+    """
+    统计事件类型的分布
+    
+    {'X': 94322, 'f': 12716, 'i': 13994, 's': 10180, 'M': 60}
+    {'cpu_op': 43665, 'fwdbwd': 7344, 'cpu_instant_event': 13992, 'user_annotation': 9, 
+    'python_function': 35089, 'kernel': 5751, 'ac2g': 15552, 'gpu_memset': 693, 'cuda_runtime': 8970, 
+    'gpu_memcpy': 105, 'cuda_driver': 33, 'gpu_user_annotation': 6, None: 62, 'Trace': 1}
+    """
+    events = trace_json['traceEvents']
+    event_types = {}
+    event_categories = {}
+    for event in events:
+        event_type = event.get('ph')
+        if event_type not in event_types:
+            event_types[event_type] = 0
+        event_types[event_type] += 1
+        
+        event_category = event.get('cat')
+        if event_category not in event_categories:
+            event_categories[event_category] = 0
+        event_categories[event_category] += 1
+    
+    return event_types, event_categories
 
 
 if __name__ == '__main__':
     trace_path, trace_json = RunProfileData._preprocess_file(path, './logs/cache')
-    profile = RunProfileData.from_json('worker_0', 1, trace_json)
+    event_types, event_categories = event_distribution(trace_json)
+    print(event_types)
+    print(event_categories)
+        
+    # profile = RunProfileData.from_json('worker_0', 1, trace_json)
+    profile = RunProfileData.parse('worker_0', 1, path, './logs/cache')
     
     profile.data_clean()
     profile.events = profile.clean_events
@@ -136,7 +165,7 @@ if __name__ == '__main__':
     results = find_node_by_name(root_node, 'ProfilerStep#', [])
     print(f"Found {len(results)} nodes with name containing 'ProfilerStep#'")
 
-    draw_memory_curve(memory_curve(profile), device='GPU0')
+    # draw_memory_curve(memory_curve(profile), device='GPU0')
     event_types = hisgramm_event_types(profile)
     draw_histogram(event_types)
 
