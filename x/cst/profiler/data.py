@@ -115,6 +115,7 @@ class RunProfileData:
         self.last_step_name = None
         self.last_step_ts = float('inf')
         self.last_step_te = 0
+        self.last_step_memory_events = []
         
     @staticmethod
     def parse(worker, span, path, cache_dir):
@@ -409,14 +410,6 @@ class RunProfileData:
             self.last_step_te = self.steps[-1][1]
         
         for tid, root_node in self.tid2tree.items():
-            node_count, node_classes, node_names, earlist_ts, latest_te = self.statistic_tree(root_node)
-            print(f"Thread {tid}:")
-            print(f"  Node Count: {node_count}")
-            print(f"  Node Classes: {node_classes}")
-            # print(f"  Node Names: {node_names}")
-            print(f"  Earliest Start Time: {earlist_ts}")
-            print(f"  Latest End Time: {latest_te}")
-            
             if 'autograd' in root_node.children[0].name:
                 # it is backward tree
                 new_tree_root = copy.deepcopy(root_node)
@@ -474,8 +467,24 @@ class RunProfileData:
                 print(f"  New Duration: {new_duration}")
                     
                 continue
+        
+        for tid, root_node in self.clean_tid2tree.items():
+            node_count, node_classes, node_names, earlist_ts, latest_te = self.statistic_tree(root_node)
+            print(f"Thread {tid}:")
+            print(f"  Node Count: {node_count}")
+            print(f"  Node Classes: {node_classes}")
+            # print(f"  Node Names: {node_names}")
+            print(f"  Earliest Start Time: {earlist_ts}")
+            print(f"  Latest End Time: {latest_te}")
             
-            
+    def clean_memory_record(self):
+        """
+        Clean the memory record, only keep the data that is after the last profiler step.
+        """
+        self.clean_events = [e for e in self.events if e.ts >= self.last_step_ts and e.ts <= self.last_step_te]
+        self.clean_memory_events = self._clean_memory_events()
+        memory_parser = MemoryParser(self.clean_memory_events)
+        self.clean_memory_snapshot = memory_parser.find_memory_nodes(self.clean_tid2tree)
     
     @staticmethod
     def statistic_tree(root_node):

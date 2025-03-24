@@ -45,8 +45,10 @@ def memory_curve(profiler):
     """
     time_metric = 'ms'
     memory_metric = 'MB'
-    memory_snapshot = profiler.memory_snapshot
-    memory_curve = get_memory_curve(time_metric=time_metric, memory_metric=memory_metric, profiler_start_ts=profiler.profiler_start_ts, memory_records=memory_snapshot.memory_records)
+    memory_snapshot = profiler.clean_memory_snapshot
+    memory_curve = get_memory_curve(time_metric=time_metric, memory_metric=memory_metric, 
+                                    profiler_start_ts=profiler.last_step_ts, 
+                                    memory_records=memory_snapshot.memory_records)
     
     return memory_curve
 
@@ -152,21 +154,20 @@ if __name__ == '__main__':
     profile = RunProfileData.parse('worker_0', 1, path, './logs/cache')
     
     profile.data_clean_tree()
-    profile.data_clean()
-    profile.events = profile.clean_events
-    profile.process()
+    # profile.data_clean()
+    profile.clean_memory_record()
 
-    if profile.tid2tree:
-        first_thread_id = next(iter(profile.tid2tree))
-        root_node = profile.tid2tree[first_thread_id]
-        print(f"Using thread ID: {first_thread_id}")
-    else:
-        raise ValueError("No thread data found in the profile")
+    # if profile.tid2tree:
+    #     first_thread_id = next(iter(profile.tid2tree))
+    #     root_node = profile.tid2tree[first_thread_id]
+    #     print(f"Using thread ID: {first_thread_id}")
+    # else:
+    #     raise ValueError("No thread data found in the profile")
     
-    results = find_node_by_name(root_node, 'ProfilerStep#', [])
-    print(f"Found {len(results)} nodes with name containing 'ProfilerStep#'")
+    # results = find_node_by_name(root_node, 'ProfilerStep#', [])
+    # print(f"Found {len(results)} nodes with name containing 'ProfilerStep#'")
 
-    # draw_memory_curve(memory_curve(profile), device='GPU0')
+    draw_memory_curve(memory_curve(profile), device='GPU0')
     event_types = hisgramm_event_types(profile)
     draw_histogram(event_types)
 
