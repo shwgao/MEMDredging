@@ -42,19 +42,26 @@ class RunProfileData:
 
         trace_body = trace_json['traceEvents']
         fwd_bwd_events = []
+        fwdbwd_events = []
+        ac2g_events = []
         for data in trace_body:
-            # if data.get('cat') == 'forward_backward':
-            if data.get('cat') == 'fwdbwd':
+            if data.get('cat') == 'forward_backward':
                 fwd_bwd_events.append(data)
             else:
                 event = trace.create_event(data, self.is_pytorch_lightning)
                 if event is not None:
                     self.profiler_start_ts = min(self.profiler_start_ts, event.ts)
                     self.events.append(event)
+            
+            if data.get('cat') == 'fwdbwd':
+                fwdbwd_events.append(data)
+            if data.get('cat') == 'ac2g':
+                ac2g_events.append(data)
 
         self.events.sort(key=lambda e: e.ts)
         self.forward_backward_events = trace.create_association_events(fwd_bwd_events)
-
+        self.fwdbwd_events = trace.create_association_events(fwdbwd_events)
+        self.ac2g_events = trace.create_association_events(ac2g_events)
         self.trace_file_path: str = None
 
         # Event Parser results
@@ -103,7 +110,8 @@ class RunProfileData:
         self.clean_tid2tree = {}
         self.clean_profiler_start_ts = -1
         self.clean_memory_snapshot: Optional[MemorySnapshot] = None
-
+        self.steps = []
+        
     @staticmethod
     def parse(worker, span, path, cache_dir):
         trace_path, trace_json = RunProfileData._preprocess_file(path, cache_dir)
@@ -177,6 +185,13 @@ class RunProfileData:
         with utils.timing('EventParser.parse'):
             parser = EventParser()
             self.tid2tree, self.pl_tid2tree = parser.parse(self.events, self.forward_backward_events)
+            parser.parse_steps(self.events, [])
+            # device_nodes_list = None
+            # for _, root_node in self.tid2tree.items():
+            #     if root_node.runtimes:
+            #         device_nodes_list = root_node.runtimes[0].device_nodes
+            # parser.update_device_steps(device_nodes_list)
+            self.steps = parser.steps            
 
         self.has_runtime = parser.has_runtime
         self.has_kernel = parser.has_kernel
@@ -380,3 +395,53 @@ class RunProfileData:
         #     self.clean_memory_snapshot = memory_parser.find_memory_nodes(self.clean_tid2tree)
         
         # self.forward_backward_events = self._clean_memory_events()
+
+
+    def data_clean_tree(self):
+        """
+        Clean the tree, only keep the data that is after the last profiler step.
+        """
+        for tid, root_node in self.tid2tree.items():
+            node_count, node_classes, node_names, earlist_ts, latest_te = self.statistic_tree(root_node)
+            print(f"Thread {tid}:")
+            print(f"  Node Count: {node_count}")
+            print(f"  Node Classes: {node_classes}")
+            # print(f"  Node Names: {node_names}")
+            print(f"  Earliest Start Time: {earlist_ts}")
+            print(f"  Latest End Time: {latest_te}")
+            
+            if 'autograd' in root_node.children[0].name:
+                # it is backward tree
+                self.clean_tid2tree[tid] = root_node.children[0]
+            
+            # for child in root_node.children:
+            #     if child.name == 'ProfilerStep#':
+            #         self.clean_tid2tree[tid] = child
+    
+    @staticmethod
+    def statistic_tree(root_node):
+        node_count = 0
+        node_classes = {}
+        node_names = {}
+        earlist_ts = float('inf')  # Should start with infinity for min comparison
+        latest_te = 0  # Should start with 0 for max comparison
+        
+        def traverse_tree(node):
+            nonlocal node_count, node_classes, node_names, earlist_ts, latest_te
+            
+            if node is None:
+                return
+            
+            node_count += 1
+            node_classes[node.__class__.__name__] = node_classes.get(node.__class__.__name__, 0) + 1
+            node_names[node.name] = node_names.get(node.name, 0) + 1
+            earlist_ts = min(earlist_ts, node.start_time)
+            latest_te = max(latest_te, node.end_time)
+            
+            for child in node.children:
+                traverse_tree(child)
+            
+        traverse_tree(root_node)
+        
+        return node_count, node_classes, node_names, earlist_ts, latest_te
+        

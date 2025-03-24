@@ -201,7 +201,9 @@ class NodeParserMixin:
         elif event.type == EventTypes.PL_PROFILE:
             op_node = PLProfileNode.create(event)
             pl_tid2list[int(tid)].append(op_node)
-
+        else:
+            # print(f'skip event: {event.category}, {event.name}, {event.type}')
+            pass
 
 class StepParser:
     def __init__(self):

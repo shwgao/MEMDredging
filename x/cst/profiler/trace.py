@@ -232,6 +232,8 @@ def create_association_events(events) -> Dict[int, int]:
             forward_map[id] = ts
         elif ph == 'f':
             backward_map[id] = ts
+        else:
+            print(f'Unknown event type: {ph}')
 
     for id, ts in forward_map.items():
         backward_ts = backward_map.get(id)
