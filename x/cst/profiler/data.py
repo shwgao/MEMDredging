@@ -384,30 +384,33 @@ class RunProfileData:
         te = self.clean_root_node.end_time
         self.clean_events = [e for e in self.events if e.ts >= ts and e.ts <= te]
         
-        # self.clean_profiler_start_ts = ts
+        self.clean_profiler_start_ts = ts
         
-        # self.clean_tid2tree
+        self.clean_tid2tree
         
-        # memory_events = self._clean_memory_events()
-        # if memory_events:
-        #     memory_parser = MemoryParser(memory_events)
-        #     self.clean_memory_snapshot = memory_parser.find_memory_nodes(self.clean_tid2tree)
+        memory_events = self._clean_memory_events()
+        if memory_events:
+            memory_parser = MemoryParser(memory_events)
+            self.clean_memory_snapshot = memory_parser.find_memory_nodes(self.clean_tid2tree)
         
-        # self.forward_backward_events = self._clean_memory_events()
+        self.forward_backward_events = self._clean_memory_events()
 
 
     def data_clean_tree(self):
         """
         Clean the tree, only keep the data that is after the last profiler step.
         """
-        if len(self.steps_names) > 1 and self.steps_names[-1] == self.steps_names[-2]:
+        if len(self.steps_names) > 2 and self.steps_names[-1] == self.steps_names[-2]:
             self.last_step_name = self.steps_names[-1]
-            self.last_step_ts = min(self.steps[-1][0], self.steps[-2][0])
-            self.last_step_te = max(self.steps[-1][1], self.steps[-2][1])
+            self.last_step_ts = min(self.steps[-1][0], self.steps[-3][0])
+            self.last_step_te = max(self.steps[-1][1], self.steps[-3][1])
         else:
             self.last_step_name = self.steps_names[-1]
-            self.last_step_ts = self.steps[-1][0]
-            self.last_step_te = self.steps[-1][1]
+            self.last_step_ts = self.steps[-2][0]
+            self.last_step_te = self.steps[-2][1]
+        
+        # print(self.profiler_start_ts - self.last_step_ts)
+        # TODO: check why the last step is not the last profiler step
         
         for tid, root_node in self.tid2tree.items():
             if 'autograd' in root_node.children[0].name:
@@ -482,6 +485,7 @@ class RunProfileData:
         Clean the memory record, only keep the data that is after the last profiler step.
         """
         self.clean_events = [e for e in self.events if e.ts >= self.last_step_ts and e.ts <= self.last_step_te]
+        # self.clean_events = self.events
         self.clean_memory_events = self._clean_memory_events()
         memory_parser = MemoryParser(self.clean_memory_events)
         self.clean_memory_snapshot = memory_parser.find_memory_nodes(self.clean_tid2tree)

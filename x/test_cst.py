@@ -154,7 +154,6 @@ if __name__ == '__main__':
     profile = RunProfileData.parse('worker_0', 1, path, './logs/cache')
     
     profile.data_clean_tree()
-    # profile.data_clean()
     profile.clean_memory_record()
 
     # if profile.tid2tree:
