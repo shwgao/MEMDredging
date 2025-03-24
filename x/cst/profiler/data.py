@@ -6,6 +6,7 @@ import io as sysio
 import json
 import re
 import tempfile
+import copy
 from json.decoder import JSONDecodeError
 from typing import Dict, List, Optional
 
@@ -111,6 +112,9 @@ class RunProfileData:
         self.clean_profiler_start_ts = -1
         self.clean_memory_snapshot: Optional[MemorySnapshot] = None
         self.steps = []
+        self.last_step_name = None
+        self.last_step_ts = float('inf')
+        self.last_step_te = 0
         
     @staticmethod
     def parse(worker, span, path, cache_dir):
@@ -185,12 +189,6 @@ class RunProfileData:
         with utils.timing('EventParser.parse'):
             parser = EventParser()
             self.tid2tree, self.pl_tid2tree = parser.parse(self.events, self.forward_backward_events)
-            parser.parse_steps(self.events, [])
-            # device_nodes_list = None
-            # for _, root_node in self.tid2tree.items():
-            #     if root_node.runtimes:
-            #         device_nodes_list = root_node.runtimes[0].device_nodes
-            # parser.update_device_steps(device_nodes_list)
             self.steps = parser.steps            
 
         self.has_runtime = parser.has_runtime
@@ -401,6 +399,15 @@ class RunProfileData:
         """
         Clean the tree, only keep the data that is after the last profiler step.
         """
+        if len(self.steps_names) > 1 and self.steps_names[-1] == self.steps_names[-2]:
+            self.last_step_name = self.steps_names[-1]
+            self.last_step_ts = min(self.steps[-1][0], self.steps[-2][0])
+            self.last_step_te = max(self.steps[-1][1], self.steps[-2][1])
+        else:
+            self.last_step_name = self.steps_names[-1]
+            self.last_step_ts = self.steps[-1][0]
+            self.last_step_te = self.steps[-1][1]
+        
         for tid, root_node in self.tid2tree.items():
             node_count, node_classes, node_names, earlist_ts, latest_te = self.statistic_tree(root_node)
             print(f"Thread {tid}:")
@@ -412,11 +419,63 @@ class RunProfileData:
             
             if 'autograd' in root_node.children[0].name:
                 # it is backward tree
-                self.clean_tid2tree[tid] = root_node.children[0]
+                new_tree_root = copy.deepcopy(root_node)
+                self.clean_tid2tree[tid] = new_tree_root
+                new_tree_root.children = []
+                
+                new_ts = float('inf')
+                new_te = 0
+                new_duration = 0
+                for child in root_node.children:
+                    if child.end_time < self.last_step_ts or child.start_time > self.last_step_te:
+                        # remove the child
+                        continue
+                    
+                    new_tree_root.children.append(child)
+                    new_ts = min(new_ts, child.start_time)
+                    new_te = max(new_te, child.end_time)
+                    new_duration += child.end_time - child.start_time
+                
+                new_tree_root.start_time = new_ts
+                new_tree_root.end_time = new_te
+                print(f"  Clamp duration: {new_te - new_ts}")
+                print(f"  New Duration: {new_duration}")
+                         
+                continue
             
-            # for child in root_node.children:
-            #     if child.name == 'ProfilerStep#':
-            #         self.clean_tid2tree[tid] = child
+            is_main_thread = False
+            for child in root_node.children:
+                if 'nn.Module' in child.name:
+                    is_main_thread = True
+                    break
+            
+            if is_main_thread:
+                # it is main thread
+                new_tree_root = copy.deepcopy(root_node)
+                self.clean_tid2tree[tid] = new_tree_root
+                new_tree_root.children = []
+                
+                new_ts = float('inf')
+                new_te = 0
+                new_duration = 0
+                for child in root_node.children:
+                    if child.end_time < self.last_step_ts or child.start_time > self.last_step_te:
+                        # remove the child
+                        continue
+                    
+                    new_tree_root.children.append(child)
+                    new_ts = min(new_ts, child.start_time)
+                    new_te = max(new_te, child.end_time)
+                    new_duration += child.end_time - child.start_time
+                
+                new_tree_root.start_time = new_ts
+                new_tree_root.end_time = new_te
+                print(f"  Clamp duration: {new_te - new_ts}")
+                print(f"  New Duration: {new_duration}")
+                    
+                continue
+            
+            
     
     @staticmethod
     def statistic_tree(root_node):

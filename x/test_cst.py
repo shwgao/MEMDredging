@@ -147,7 +147,7 @@ if __name__ == '__main__':
     event_types, event_categories = event_distribution(trace_json)
     print(event_types)
     print(event_categories)
-
+    
     # profile = RunProfileData.from_json('worker_0', 1, trace_json)
     profile = RunProfileData.parse('worker_0', 1, path, './logs/cache')
     
