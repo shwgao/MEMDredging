@@ -1,6 +1,6 @@
 import torch
 import monai
-from sam_modeling import SamModel
+from src.sam_modeling import SamModel
 from transformers import SamProcessor
 
 seg_loss = monai.losses.DiceCELoss(sigmoid=True, squared_pred=True, reduction='mean')
@@ -10,8 +10,14 @@ class ModelWrapper(torch.nn.Module):
   def __init__(self):
     super().__init__()
     self.model = SamModel.from_pretrained("facebook/sam-vit-base")
+    self.batch_aggregate = False
+    self.mini_batch = 8
+    self.checkpointing = False
 
   def forward(self, inputs, ground_truth_masks):
+    self.model.batch_aggregate = self.batch_aggregate
+    self.model.mini_batch = self.mini_batch
+    self.model.checkpointing = self.checkpointing
     outputs = self.model(**inputs, multimask_output=False)
     loss = self.compute_loss(outputs.pred_masks, ground_truth_masks)
     return loss

@@ -25,7 +25,7 @@ import torch.nn.functional as F
 import torch.utils.checkpoint
 from torch import Tensor, nn
 
-from sam_utils import *
+from src.sam_utils import *
 from transformers.utils import ModelOutput, add_start_docstrings, add_start_docstrings_to_model_forward, logging
 from transformers.modeling_utils import PreTrainedModel
 from transformers.modeling_outputs import BaseModelOutput
@@ -800,7 +800,7 @@ class SamVisionAttention(nn.Module):
     
     def micro_batch_Attention(self, x, fn):
         batch_size = x.shape[0]
-        mini_batch = 4*300
+        mini_batch = 1*300
         mini_batch_size = math.ceil(batch_size / mini_batch)
         output = []
         for i in range(mini_batch_size):
@@ -857,7 +857,7 @@ class SamVisionAttention(nn.Module):
         attn = attn.reshape(batch_size, query_height * query_width, key_height * key_width)
         return attn
 
-    def forward(self, hidden_states: torch.Tensor, output_attentions=False) -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor, output_attentions=False, batch_aggregate=False, mini_batch=8, checkpointing=False) -> torch.Tensor:
         batch_size, height, width, _ = hidden_states.shape
         # qkv with shape (3, batch_size, nHead, height * width, channel)
         qkv = (
@@ -870,13 +870,22 @@ class SamVisionAttention(nn.Module):
 
         attn_weights = (query * self.scale) @ key.transpose(-2, -1)
 
+        # if self.use_rel_pos:
+        #     attn_weights = self.add_decomposed_rel_pos_with_micro_batch(
+        #         attn_weights, query, self.rel_pos_h, self.rel_pos_w, (height, width), (height, width)
+        #     )
+        
         if self.use_rel_pos:
-            attn_weights = self.add_decomposed_rel_pos_with_micro_batch(
-                attn_weights, query, self.rel_pos_h, self.rel_pos_w, (height, width), (height, width)
-            )
+            if batch_aggregate:
+                attn_weights = self.add_decomposed_rel_pos_with_micro_batch(
+                    attn_weights, query, self.rel_pos_h, self.rel_pos_w, (height, width), (height, width)
+                )
+            else:
+                attn_weights = self.add_decomposed_rel_pos(
+                    attn_weights, query, self.rel_pos_h, self.rel_pos_w, (height, width), (height, width)
+                )
 
         attn_weights = torch.nn.functional.softmax(attn_weights, dtype=torch.float32, dim=-1).to(query.dtype)
-
         attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
 
         attn_output = (attn_probs @ value).reshape(batch_size, self.num_attention_heads, height, width, -1)
@@ -1216,6 +1225,10 @@ class SamModel(SamPreTrainedModel):
 
     def __init__(self, config):
         super().__init__(config)
+        self.batch_aggregate = False
+        self.mini_batch = 8
+        self.checkpointing = False
+        
         self.shared_image_embedding = SamPositionalEmbedding(config.vision_config)
 
         self.vision_encoder = SamVisionEncoder(config.vision_config)

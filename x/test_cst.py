@@ -1,9 +1,10 @@
 from cst.profiler.data import RunProfileData
 from cst.memory import get_memory_curve
+from cst.profiler.module_op import get_module_tree
 import matplotlib.pyplot as plt
 
 
-path = './logs/enformer/eagertrain_False-bz8-V100-bagg_False-mb_2/dgx2-4.hpc.engr.oregonstate.edu_315437.1740595825699720383.pt.trace.json'
+path1 = './logs/enformer/eagertrain_False-bz8-V100-bagg_False-mb_2/dgx2-4.hpc.engr.oregonstate.edu_315437.1740595825699720383.pt.trace.json'
 path = './logs/enformer/eagertrain_True-bz2-V100-bagg_False-mb_4-check_False/tensorboard.pt.trace.json/dgx2-2.hpc.engr.oregonstate.edu_3726680.1742342040000112971.pt.trace.json'
 name = 'enformer'
 
@@ -54,7 +55,7 @@ def memory_curve(profiler):
 
 # memory_curve(profile)
 
-def draw_memory_curve(memory_curve, device='GPU0'):
+def draw_memory_curve(memory_curve, device='GPU0', name=''):
     """
     绘制指定 device 的 memory curve，数据格式为 [allocated, reserved, time]
     """
@@ -75,12 +76,12 @@ def draw_memory_curve(memory_curve, device='GPU0'):
     plt.plot(times, reserved, label='Reserved')
     plt.xlabel('Time (ms)')
     plt.ylabel('Memory (MB)')
-    plt.title(f'Memory Curve for Enformer with batch size 8(Inference)')
+    plt.title(f'Memory Curve for Enformer with batch size 8({name})')
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f'./logs/Enformer_{device}_memory_curve.png')
+    plt.savefig(f'./logs/Enformer_{device}_memory_curve_{name}.png')
     plt.close()
-    print(f"已保存 {device} 的 memory curve 到 ./logs/Enformer_{device}_memory_curve.png")
+    print(f"已保存 {device} 的 memory curve 到 ./logs/Enformer_{device}_memory_curve_{name}.png")
 
 def draw_histogram(event_types):
     """
@@ -99,9 +100,9 @@ def draw_histogram(event_types):
     plt.title('Event Type Distribution of Enformer(training)')
     plt.xticks(rotation=90)
     plt.tight_layout()
-    plt.savefig('./logs/event_type_distribution.png')
+    plt.savefig(f'./logs/event_type_distribution_{name}.png')
     plt.close()
-    print("已保存事件类型分布图到 ./logs/event_type_distribution.png")
+    print(f"已保存事件类型分布图到 ./logs/event_type_distribution_{name}.png")
     
 
 def hisgramm_event_types(profile):
@@ -144,7 +145,7 @@ def event_distribution(trace_json):
     return event_types, event_categories
 
 
-if __name__ == '__main__':
+def get_profile_from_json(path):
     trace_path, trace_json = RunProfileData._preprocess_file(path, './logs/cache')
     event_types, event_categories = event_distribution(trace_json)
     print(event_types)
@@ -155,19 +156,67 @@ if __name__ == '__main__':
     
     profile.data_clean_tree()
     profile.clean_memory_record()
-
-    # if profile.tid2tree:
-    #     first_thread_id = next(iter(profile.tid2tree))
-    #     root_node = profile.tid2tree[first_thread_id]
-    #     print(f"Using thread ID: {first_thread_id}")
-    # else:
-    #     raise ValueError("No thread data found in the profile")
     
-    # results = find_node_by_name(root_node, 'ProfilerStep#', [])
-    # print(f"Found {len(results)} nodes with name containing 'ProfilerStep#'")
+    module_tree = get_module_tree(profile.clean_tid2tree)
+    return profile, module_tree
 
-    draw_memory_curve(memory_curve(profile), device='GPU0')
-    event_types = hisgramm_event_types(profile)
+def memory_property_set(root_node, memory_events):
+    # convert memory B to MB
+    for event in memory_events:
+        event._total_allocated = event.total_allocated / 1024 / 1024
+        event._total_reserved = event.total_reserved / 1024 / 1024
+        event._bytes = event.bytes / 1024 / 1024
+    
+    # set attributes for each node
+    def set_attributes(node):
+        node.peak_memory = 0
+        node.allocated_span = 0
+        node.released_span = 0
+        for child in node.children:
+            set_attributes(child)
+        
+    def traverse_tree(node, event):
+        if node.start_time <= event.ts and node.end_time >= event.ts:
+            node.peak_memory = max(node.peak_memory, event._total_allocated)
+            if event._bytes > 0:
+                node.allocated_span += event._bytes
+            else:
+                node.released_span += -(event._bytes)
+        else:
+            return
+                
+        for child in node.children:
+            traverse_tree(child, event)
+
+    set_attributes(root_node)
+    
+    for event in memory_events:
+        traverse_tree(root_node, event)
+
+def tree_sub_nodes_num(root_node):
+    """为每棵树的每个节点添加子树节点数量属性（包含节点本身）"""
+    def set_sub_nodes_num(node):
+        node.sub_nodes_num = 1  # 初始化为1，计入节点本身
+        
+        if not node.children:
+            return 1
+        
+        for child in node.children:
+            node.sub_nodes_num += set_sub_nodes_num(child)
+        
+        return node.sub_nodes_num
+    
+    set_sub_nodes_num(root_node)
+
+if __name__ == '__main__':
+    # profile_train, module_tree_train = get_profile_from_json(path)
+    profile_inference, module_tree_inference = get_profile_from_json(path1)
+    
+    clean_memory_events = profile_inference.clean_memory_events
+    memory_property_set(module_tree_inference[0], clean_memory_events)
+    
+    draw_memory_curve(memory_curve(profile_inference), device='GPU0', name='inference')
+    event_types = hisgramm_event_types(profile_inference)
     draw_histogram(event_types)
 
     # remove_multi_profiler_steps(root_node)

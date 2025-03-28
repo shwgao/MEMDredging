@@ -85,28 +85,28 @@ class Transformer(nn.Module):
         self.norm = nn.LayerNorm(dim)
         self.layers = nn.ModuleList([])
         for _ in range(depth):
-            self.layers.append(nn.ModuleList([
-                Attention(dim, heads = heads, dim_head = dim_head, dropout = dropout),
-                FeedForward(dim, mlp_dim, dropout = dropout)
-            ]))
-
-    # def forward(self, x):
-    #     for attn, ff in self.layers:
-    #         x = attn(x) + x
-    #         x = ff(x) + x
-
-    #     return self.norm(x)
-    
-    def forward(self, x, batch_aggregate, mini_batch, checkpointing=False):
-        for attn, ff in self.layers:
-            if batch_aggregate:
-                x = micro_batch_Attention(x, attn, mini_batch, checkpointing) + x
-            else:
+            self.layers.append(
+                nn.Sequential(
+                    Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout),
+                    FeedForward(dim, mlp_dim, dropout=dropout),
+                    nn.LayerNorm(dim)
+                )
+            )
+        
+    def forward(self, x, batch_aggregate=False, mini_batch=1, checkpointing=False):
+        if batch_aggregate:
+            x = micro_batch_Attention(x, self._forward, mini_batch, checkpointing)
+        else:
+            for layer in self.layers:
                 if checkpointing:
-                    x = checkpoint(attn, x) + x
+                    x = checkpoint(layer, x)
                 else:
-                    x = attn(x) + x
-            x = ff(x) + x
+                    x = layer(x)
+        return self.norm(x)
+    
+    def _forward(self, x):
+        for layer in self.layers:
+            x = layer(x)
         return self.norm(x)
 
 class ViT(nn.Module):

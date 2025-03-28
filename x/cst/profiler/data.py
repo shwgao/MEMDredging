@@ -516,4 +516,18 @@ class RunProfileData:
         traverse_tree(root_node)
         
         return node_count, node_classes, node_names, earlist_ts, latest_te
+    
+    def clean_module_tree(self):
         
+        def traverse_tree(node, brother_nodes):
+            if not node.children:
+                if not 'nn.Module' in node.name:
+                    return False
+            else:
+                for child in node.children:
+                    brother_nodes.append(child)
+                    traverse_tree(child, brother_nodes)
+            
+            
+            
+            

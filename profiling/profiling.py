@@ -7,7 +7,7 @@ import argparse
 from typing import Iterable
 from profile_tools import ModelProfiler, DataLoaderGenerator
 from DaYu.asyncPipelineModel import AsyncPipelineModel
-from utils import log_results, overwrite_dir, clean_cuda_cache
+from utils import log_results, overwrite_dir, clean_cuda_cache, get_model_parameters
 import torch
 import shutil
 from pprint import pprint
@@ -21,7 +21,11 @@ torch.manual_seed(42)
 
 def single_profile(args, model):    
     inputs, batch_index, is_batched = get_inputs(args.batch_size)
-    
+    num_params, memory_size = get_model_parameters(model)
+    print(f"Model parameters: {num_params}, {memory_size} MB")
+    input_memory = sum(i.numel() * 4 / 1024**2 for i in inputs if hasattr(i, "numel"))
+    print(f"Input memory: {input_memory} MB")
+        
     if args.is_training:
         model.train()
     else:
@@ -139,22 +143,22 @@ def check_gradients(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="enformer", help="")
+parser.add_argument("--model", type=str, default="sam", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
-parser.add_argument("--is_training", type=bool, default=True)
+parser.add_argument("--is_training", type=bool, default=False)
 parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
-parser.add_argument("--torch_profiling", type=bool, default=True)
+parser.add_argument("--torch_profiling", type=bool, default=False)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
 parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
 parser.add_argument("--batch_cat_aggregate", type=bool, default=False, help="Only useful for climax")
 parser.add_argument("--batch_aggregate", type=bool, default=False)
-parser.add_argument("--mini_batch", type=int, default=4)
+parser.add_argument("--mini_batch", type=int, default=2)
 parser.add_argument("--checkpointing", type=bool, default=False)
 
 args = parser.parse_args()
@@ -175,15 +179,15 @@ elif args.model == "climode": # seems not suitable for our work because of large
 elif args.model == "cosmoflow":
     from src.cosmoflow import get_model, get_inputs
     batch_sizes = list(range(1, 60, 2))
-    args.batch_size = 64
+    args.batch_size = 102
 elif args.model == "sam":
     from src.sam import get_model, get_inputs
     batch_sizes = list(range(1, 20, 1))
-    args.batch_size = 3
+    args.batch_size = 10 # training: 3, inference: 10
 elif args.model == "simmim":
     from src.simmim import get_model, get_inputs
     batch_sizes = list(range(1, 30, 1))
-    args.batch_size = 8
+    args.batch_size = 5
 else:
     raise ValueError(f"Model {args.model} not supported")
 

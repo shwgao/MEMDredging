@@ -214,6 +214,12 @@ def micro_batch(input, fn, batch_size, mini_batch, use_checkpoint=False):
     return x
 
 
+def get_model_parameters(model):
+    num_params = sum(p.numel() for p in model.parameters())
+    memory_size = num_params * 4 / 1024**2
+    return num_params, memory_size
+
+
 if __name__ == "__main__":
     # Plot the data
     memory_table, throughput_table, batch_sizes, stream_nums = read_from_file("logs/enformer-pytorch-backend-V100-2025-01-10-17-20-00.txt")
