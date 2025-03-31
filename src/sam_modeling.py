@@ -24,6 +24,7 @@ import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
 from torch import Tensor, nn
+from torch.utils.checkpoint import checkpoint
 
 from src.sam_utils import *
 from transformers.utils import ModelOutput, add_start_docstrings, add_start_docstrings_to_model_forward, logging
@@ -811,7 +812,6 @@ class SamVisionAttention(nn.Module):
         x = torch.cat(output, dim=0)
         return x
     
-
     def add_decomposed_rel_pos(
         self,
         attn: torch.Tensor,
@@ -857,7 +857,7 @@ class SamVisionAttention(nn.Module):
         attn = attn.reshape(batch_size, query_height * query_width, key_height * key_width)
         return attn
 
-    def forward(self, hidden_states: torch.Tensor, output_attentions=False, batch_aggregate=False, mini_batch=8, checkpointing=False) -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor, output_attentions=False) -> torch.Tensor:
         batch_size, height, width, _ = hidden_states.shape
         # qkv with shape (3, batch_size, nHead, height * width, channel)
         qkv = (
@@ -876,14 +876,9 @@ class SamVisionAttention(nn.Module):
         #     )
         
         if self.use_rel_pos:
-            if batch_aggregate:
-                attn_weights = self.add_decomposed_rel_pos_with_micro_batch(
-                    attn_weights, query, self.rel_pos_h, self.rel_pos_w, (height, width), (height, width)
-                )
-            else:
-                attn_weights = self.add_decomposed_rel_pos(
-                    attn_weights, query, self.rel_pos_h, self.rel_pos_w, (height, width), (height, width)
-                )
+            attn_weights = self.add_decomposed_rel_pos(
+                attn_weights, query, self.rel_pos_h, self.rel_pos_w, (height, width), (height, width)
+            )
 
         attn_weights = torch.nn.functional.softmax(attn_weights, dtype=torch.float32, dim=-1).to(query.dtype)
         attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
@@ -963,11 +958,34 @@ class SamVisionLayer(nn.Module):
 
         hidden_states = hidden_states[:, :height, :width, :].contiguous()
         return hidden_states
-
+    
+    def micro_batch_Attention(self, x, fn, mini_batch, checkpointing=False):
+        batch_size = x.shape[0]
+        mini_batch_size = math.ceil(batch_size / mini_batch)
+        output1 = []
+        output2 = []
+        for i in range(mini_batch_size):
+            start = i * mini_batch
+            end = min((i+1) * mini_batch, batch_size)
+            if checkpointing:
+                x1_i, x2_i = checkpoint(fn, x[start:end, :, :])
+            else:
+                x1_i, x2_i = fn(x[start:end, :, :])
+            output1.append(x1_i)
+            output2.append(x2_i)
+        x1 = torch.cat(output1, dim=0)
+        x2 = None
+        
+        return x1, x2
+        
+        
     def forward(
         self,
         hidden_states: torch.Tensor,
         output_attentions: Optional[bool] = False,
+        mini_batch: Optional[int] = None,
+        batch_aggregate: Optional[bool] = None,
+        checkpointing: Optional[bool] = None,
     ) -> Tuple[torch.FloatTensor]:
         residual = hidden_states
 
@@ -977,10 +995,14 @@ class SamVisionLayer(nn.Module):
             height, width = hidden_states.shape[1], hidden_states.shape[2]
             hidden_states, padding_shape = self.window_partition(hidden_states, self.window_size)
 
-        hidden_states, attn_weights = self.attn(
-            hidden_states=hidden_states,
-            output_attentions=output_attentions,
-        )
+        if batch_aggregate:
+            hidden_states, attn_weights = self.micro_batch_Attention(hidden_states, self.attn, mini_batch, checkpointing)
+        else:
+            if checkpointing:
+                hidden_states, attn_weights = checkpoint(self.attn, hidden_states, output_attentions)
+            else:
+                hidden_states, attn_weights = self.attn(hidden_states, output_attentions)
+            
         # Reverse window partition
         if self.window_size > 0:
             hidden_states = self.window_unpartition(hidden_states, self.window_size, padding_shape, (height, width))
@@ -1057,6 +1079,9 @@ class SamVisionEncoder(nn.Module):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        mini_batch: Optional[int] = None,
+        batch_aggregate: Optional[bool] = None,
+        checkpointing: Optional[bool] = None,
     ) -> Union[Tuple, SamVisionEncoderOutput]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1084,7 +1109,10 @@ class SamVisionEncoder(nn.Module):
                     hidden_states,
                 )
             else:
-                layer_outputs = layer_module(hidden_states, output_attentions=output_attentions)
+                batch_agg = True if i in [2, 5, 8, 11] and batch_aggregate else False
+                layer_outputs = layer_module(hidden_states, output_attentions=output_attentions, 
+                                            mini_batch=mini_batch, batch_aggregate=batch_agg, 
+                                            checkpointing=checkpointing)
 
             hidden_states = layer_outputs[0]
 
@@ -1226,7 +1254,7 @@ class SamModel(SamPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.batch_aggregate = False
-        self.mini_batch = 8
+        self.mini_batch = 1
         self.checkpointing = False
         
         self.shared_image_embedding = SamPositionalEmbedding(config.vision_config)
@@ -1405,6 +1433,9 @@ class SamModel(SamPreTrainedModel):
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
+                mini_batch=self.mini_batch,
+                batch_aggregate=self.batch_aggregate,
+                checkpointing=self.checkpointing,
             )
             image_embeddings = vision_outputs[0]
 

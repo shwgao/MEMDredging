@@ -150,7 +150,7 @@ parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
-parser.add_argument("--is_training", type=bool, default=True)
+parser.add_argument("--is_training", type=bool, default=False)
 parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
 parser.add_argument("--torch_profiling", type=bool, default=False)
@@ -183,7 +183,7 @@ elif args.model == "cosmoflow":
 elif args.model == "sam":
     from src.sam import get_model, get_inputs
     batch_sizes = list(range(1, 20, 1))
-    args.batch_size = 10 # training: 3, inference: 10
+    args.batch_size = 3 # training: 3, inference: 10
 elif args.model == "simmim":
     from src.simmim import get_model, get_inputs
     batch_sizes = list(range(1, 30, 1))
