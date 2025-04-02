@@ -160,6 +160,22 @@ def get_profile_from_json(path):
     module_tree = get_module_tree(profile.clean_tid2tree)
     return profile, module_tree
 
+
+def count_childern_num(root_node):
+    """
+    计算每个节点的子节点数量
+    """
+    if root_node.children is None:
+        return 0
+    
+    for node in root_node.children:
+        if not hasattr(node, 'childern_num'):
+            node.childern_num = 0
+        node.childern_num += count_childern_num(node)
+        
+    return node.childern_num
+        
+
 def memory_property_set(root_node, memory_events):
     # convert memory B to MB
     for event in memory_events:
@@ -192,6 +208,15 @@ def memory_property_set(root_node, memory_events):
     
     for event in memory_events:
         traverse_tree(root_node, event)
+
+
+def cost_tree(root_node):
+    """
+    计算每棵树的 cost
+    """
+    for node in root_node.children:
+        node.cost = node.peak_memory * (node.end_time - node.start_time)
+        
 
 def tree_sub_nodes_num(root_node):
     """为每棵树的每个节点添加子树节点数量属性（包含节点本身）"""

@@ -9,6 +9,8 @@ from torch.utils.data import DataLoader
 from DaYu.asyncPipelineModel import AsyncPipelineModel
 from torch.profiler import ExecutionTraceObserver
 
+from torchao.prototype.low_bit_optim import CPUOffloadOptimizer
+
 from pynvml import nvmlInit, nvmlDeviceGetMemoryInfo, nvmlDeviceGetHandleByIndex
 
 
@@ -24,7 +26,9 @@ class ModelProfiler:
         
         if self.is_training:
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
-        
+            # self.optimizer = CPUOffloadOptimizer(self.model.parameters(), device=self.device)
+            from torch.optim import Adam
+            self.optimizer = CPUOffloadOptimizer(self.model.parameters(), Adam, lr=1e-5, fused=True)
         nvmlInit()  # Add NVML initialization
     
     @property
