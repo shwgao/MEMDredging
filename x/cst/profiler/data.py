@@ -18,7 +18,7 @@ from .event_parser import CommLibTypes, EventParser, ProfileRole
 from .gpu_metrics_parser import GPUMetricsParser
 from .kernel_parser import KernelParser
 from .memory_parser import MemoryParser, MemorySnapshot
-from .node import OperatorNode
+from .node import OperatorNode, ProfilerStepNode, ModuleNode
 from .op_agg import ModuleAggregator
 from .overall_parser import OverallParser
 from .tensor_cores_parser import TensorCoresParser
@@ -400,76 +400,99 @@ class RunProfileData:
         """
         Clean the tree, only keep the data that is after the last profiler step.
         """
-        if len(self.steps_names) > 2 and self.steps_names[-1] == self.steps_names[-2]:
-            self.last_step_name = self.steps_names[-1]
-            self.last_step_ts = min(self.steps[-1][0], self.steps[-3][0])
-            self.last_step_te = max(self.steps[-1][1], self.steps[-3][1])
-        else:
-            self.last_step_name = self.steps_names[-1]
-            self.last_step_ts = self.steps[-2][0]
-            self.last_step_te = self.steps[-2][1]
+        # if len(self.steps_names) > 2 and self.steps_names[-1] == self.steps_names[-2]:
+        #     self.last_step_name = self.steps_names[-1]
+        #     self.last_step_ts = min(self.steps[-1][0], self.steps[-3][0])
+        #     self.last_step_te = max(self.steps[-1][1], self.steps[-3][1])
+        # else:
+        #     # chose the longest step
+        #     if self.steps[-2][1]-self.steps[-2][0] > self.steps[-1][1]-self.steps[-1][0]:
+        #         self.last_step_name = self.steps_names[-2]
+        #         self.last_step_ts = self.steps[-2][0]
+        #         self.last_step_te = self.steps[-2][1]
+        #     else:
+        #         self.last_step_name = self.steps_names[-1]
+        #         self.last_step_ts = self.steps[-1][0]
+        #         self.last_step_te = self.steps[-1][1]
         
         # print(self.profiler_start_ts - self.last_step_ts)
         # TODO: check why the last step is not the last profiler step
         
+        self.main_thread_tid = None
+        self.backward_tid = None
+        self.cuda_tid = None
         for tid, root_node in self.tid2tree.items():
-            if 'autograd' in root_node.children[0].name:
-                # it is backward tree
-                new_tree_root = copy.deepcopy(root_node)
-                self.clean_tid2tree[tid] = new_tree_root
-                new_tree_root.children = []
-                
-                new_ts = float('inf')
-                new_te = 0
-                new_duration = 0
-                for child in root_node.children:
-                    if child.end_time < self.last_step_ts or child.start_time > self.last_step_te:
-                        # remove the child
-                        continue
-                    
-                    new_tree_root.children.append(child)
-                    new_ts = min(new_ts, child.start_time)
-                    new_te = max(new_te, child.end_time)
-                    new_duration += child.end_time - child.start_time
-                
-                new_tree_root.start_time = new_ts
-                new_tree_root.end_time = new_te
-                print(f"  Clamp duration: {new_te - new_ts}")
-                print(f"  New Duration: {new_duration}")
-                         
-                continue
-            
-            is_main_thread = False
             for child in root_node.children:
                 if 'nn.Module' in child.name:
-                    is_main_thread = True
+                    self.main_thread_tid = tid
                     break
             
-            if is_main_thread:
-                # it is main thread
-                new_tree_root = copy.deepcopy(root_node)
-                self.clean_tid2tree[tid] = new_tree_root
-                new_tree_root.children = []
+            if 'autograd' in root_node.children[0].name:
+                self.backward_tid = tid
                 
-                new_ts = float('inf')
-                new_te = 0
-                new_duration = 0
-                for child in root_node.children:
-                    if child.end_time < self.last_step_ts or child.start_time > self.last_step_te:
-                        # remove the child
-                        continue
-                    
-                    new_tree_root.children.append(child)
-                    new_ts = min(new_ts, child.start_time)
-                    new_te = max(new_te, child.end_time)
-                    new_duration += child.end_time - child.start_time
+            if 'cuda' in root_node.children[0].name:
+                self.cuda_tid = tid
+        
+        # to find the last step
+        # check the last child if profiler step and the second last child is nn.Module in main thread
+        main_thread_root = self.tid2tree[self.main_thread_tid]
+        if isinstance(main_thread_root.children[-1], ProfilerStepNode) and \
+            isinstance(main_thread_root.children[-2], ModuleNode):
+            self.last_step_ts = min(main_thread_root.children[-1].start_time, main_thread_root.children[-2].start_time)
+            self.last_step_te = max(main_thread_root.children[-1].end_time, main_thread_root.children[-2].end_time)
+        else:
+            # raise error
+            raise ValueError("Last step is not a profiler step")
+        
+        # clean backward tree
+        if self.backward_tid is not None:
+            new_tree_root = copy.deepcopy(self.tid2tree[self.backward_tid])
+            self.clean_tid2tree[self.backward_tid] = new_tree_root
+            new_tree_root.children = []
+            
+            new_ts = float('inf')
+            new_te = 0
+            new_duration = 0
+            for child in new_tree_root.children:
+                if child.end_time < self.last_step_ts or child.start_time > self.last_step_te:
+                    # remove the child
+                    continue
                 
-                new_tree_root.start_time = new_ts
-                new_tree_root.end_time = new_te
-                print(f"  Clamp duration: {new_te - new_ts}")
-                print(f"  New Duration: {new_duration}")
-                    
-                continue
+                new_tree_root.children.append(child)
+                new_ts = min(new_ts, child.start_time)
+                new_te = max(new_te, child.end_time)
+                new_duration += child.end_time - child.start_time
+            
+            new_tree_root.start_time = new_ts
+            new_tree_root.end_time = new_te
+            print(f"  Clamp duration: {new_te - new_ts}")
+            print(f"  New Duration: {new_duration}")
+        
+        # clean main thread tree
+        if self.main_thread_tid is not None:
+            # new_tree_root = copy.deepcopy(self.tid2tree[self.main_thread_tid])
+            new_tree_root = self.tid2tree[self.main_thread_tid]
+            self.clean_tid2tree[self.main_thread_tid] = new_tree_root
+            new_children = []
+            
+            new_ts = float('inf')
+            new_te = 0
+            new_duration = 0
+            for child in new_tree_root.children:
+                if child.end_time < self.last_step_ts or child.start_time > self.last_step_te:
+                    # remove the child
+                    continue
+                
+                new_children.append(child)
+                new_ts = min(new_ts, child.start_time)
+                new_te = max(new_te, child.end_time)
+                new_duration += child.end_time - child.start_time
+                
+            new_tree_root.children = new_children
+            new_tree_root.start_time = new_ts
+            new_tree_root.end_time = new_te
+            print(f"  Clamp duration: {new_te - new_ts}")
+            print(f"  New Duration: {new_duration}")
         
         for tid, root_node in self.clean_tid2tree.items():
             node_count, node_classes, node_names, earlist_ts, latest_te = self.statistic_tree(root_node)

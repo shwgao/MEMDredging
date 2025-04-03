@@ -2,11 +2,7 @@ from cst.profiler.data import RunProfileData
 from cst.memory import get_memory_curve
 from cst.profiler.module_op import get_module_tree
 import matplotlib.pyplot as plt
-
-
-path1 = './logs/enformer/eagertrain_False-bz8-V100-bagg_False-mb_2/dgx2-4.hpc.engr.oregonstate.edu_315437.1740595825699720383.pt.trace.json'
-path = './logs/enformer/eagertrain_True-bz2-V100-bagg_False-mb_4-check_False/tensorboard.pt.trace.json/dgx2-2.hpc.engr.oregonstate.edu_3726680.1742342040000112971.pt.trace.json'
-name = 'enformer'
+import json
 
 
 def find_node_by_name(node, name, results): 
@@ -76,14 +72,14 @@ def draw_memory_curve(memory_curve, device='GPU0', name=''):
     plt.plot(times, reserved, label='Reserved')
     plt.xlabel('Time (ms)')
     plt.ylabel('Memory (MB)')
-    plt.title(f'Memory Curve for Enformer with batch size 8({name})')
+    plt.title(f'Memory Curve for {name} with batch size 8')
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f'./logs/Enformer_{device}_memory_curve_{name}.png')
+    plt.savefig(f'./logs/{name}_{device}_memory_curve.png')
     plt.close()
-    print(f"已保存 {device} 的 memory curve 到 ./logs/Enformer_{device}_memory_curve_{name}.png")
+    print(f"已保存 {device} 的 memory curve 到 ./logs/{name}_{device}_memory_curve.png")
 
-def draw_histogram(event_types):
+def draw_histogram(event_types, name):
     """
     绘制事件类型的直方图
     """
@@ -97,12 +93,12 @@ def draw_histogram(event_types):
     plt.bar(event_names, event_counts)
     plt.xlabel('Event Types')
     plt.ylabel('Counts')
-    plt.title('Event Type Distribution of Enformer(training)')
+    plt.title(f'Event Type Distribution of {name}')
     plt.xticks(rotation=90)
     plt.tight_layout()
-    plt.savefig(f'./logs/event_type_distribution_{name}.png')
+    plt.savefig(f'./logs/{name}_event_type_distribution.png')
     plt.close()
-    print(f"已保存事件类型分布图到 ./logs/event_type_distribution_{name}.png")
+    print(f"已保存事件类型分布图到 ./logs/{name}_event_type_distribution.png")
     
 
 def hisgramm_event_types(profile):
@@ -161,22 +157,25 @@ def get_profile_from_json(path):
     return profile, module_tree
 
 
-def count_childern_num(root_node):
+def tree_sub_nodes_num(root_node):
     """
-    计算每个节点的子节点数量
+    为每棵树的每个节点添加子树节点数量属性
     """
+    if not hasattr(root_node, 'sub_nodes_num'):
+        root_node.sub_nodes_num = 1
+    
     if root_node.children is None:
-        return 0
+        return root_node.sub_nodes_num
     
     for node in root_node.children:
-        if not hasattr(node, 'childern_num'):
-            node.childern_num = 0
-        node.childern_num += count_childern_num(node)
+        root_node.sub_nodes_num += tree_sub_nodes_num(node)
         
-    return node.childern_num
-        
+    return root_node.sub_nodes_num
+
 
 def memory_property_set(root_node, memory_events):
+    tree_sub_nodes_num(root_node)
+    
     # convert memory B to MB
     for event in memory_events:
         event._total_allocated = event.total_allocated / 1024 / 1024
@@ -216,33 +215,40 @@ def cost_tree(root_node):
     """
     for node in root_node.children:
         node.cost = node.peak_memory * (node.end_time - node.start_time)
-        
 
-def tree_sub_nodes_num(root_node):
-    """为每棵树的每个节点添加子树节点数量属性（包含节点本身）"""
-    def set_sub_nodes_num(node):
-        node.sub_nodes_num = 1  # 初始化为1，计入节点本身
-        
-        if not node.children:
-            return 1
-        
-        for child in node.children:
-            node.sub_nodes_num += set_sub_nodes_num(child)
-        
-        return node.sub_nodes_num
+def node_cost_set(root_node, cost_set):
+    """
+    将所有节点添加到 cost_set 中
+    """
+    cost = (root_node.peak_memory / (root_node.end_time - root_node.start_time)) * (root_node.allocated_span + root_node.released_span) / root_node.sub_nodes_num
+    cost_set[root_node.name] = cost
     
-    set_sub_nodes_num(root_node)
+    if root_node.children is None:
+        return
+    
+    for child in root_node.children:
+        node_cost_set(child, cost_set)
+                
 
 if __name__ == '__main__':
     # profile_train, module_tree_train = get_profile_from_json(path)
+    config = json.load(open('x/cst_config.json'))
+    name = 'enformer'
+    path1 = config[name]['inference_path']
+    
     profile_inference, module_tree_inference = get_profile_from_json(path1)
     
     clean_memory_events = profile_inference.clean_memory_events
     memory_property_set(module_tree_inference[0], clean_memory_events)
     
-    draw_memory_curve(memory_curve(profile_inference), device='GPU0', name='inference')
-    event_types = hisgramm_event_types(profile_inference)
-    draw_histogram(event_types)
+    cost_set = {}
+    node_cost_set(module_tree_inference[0], cost_set)
+    sorted_cost_set = sorted(cost_set.items(), key=lambda x: x[1], reverse=True)
+    print(sorted_cost_set[:10]) # print the top 10
+    
+    # draw_memory_curve(memory_curve(profile_inference), device='GPU0', name=f'{name}_inference')
+    # event_types = hisgramm_event_types(profile_inference)
+    # draw_histogram(event_types, name)
 
     # remove_multi_profiler_steps(root_node)
     # remove_multi_aten_ops(root_node)

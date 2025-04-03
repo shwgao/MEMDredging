@@ -1,0 +1,10 @@
+{
+    "toy_model": {
+        "inference_path": "logs/toy_model/tensorboard.pt.trace.json/dgx2-5.hpc.engr.oregonstate.edu_209306.1743609706930541385.pt.trace.json"
+    },
+    
+    "enformer": {
+        "train_path": "./logs/enformer/eagertrain_True-bz2-V100-bagg_False-mb_4-check_False/tensorboard.pt.trace.json/dgx2-2.hpc.engr.oregonstate.edu_3726680.1742342040000112971.pt.trace.json",
+        "inference_path": "./logs/enformer/eagertrain_False-bz8-V100-bagg_False-mb_2/dgx2-4.hpc.engr.oregonstate.edu_315437.1740595825699720383.pt.trace.json"
+    }
+}
