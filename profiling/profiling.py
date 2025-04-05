@@ -5,18 +5,19 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import argparse
 from typing import Iterable
-from profile_tools import ModelProfiler, DataLoaderGenerator
+from profile_tools2 import ModelProfiler, DataLoaderGenerator
 from DaYu.asyncPipelineModel import AsyncPipelineModel
 from utils import log_results, overwrite_dir, clean_cuda_cache, get_model_parameters
 import torch
 import shutil
 from pprint import pprint
-from torch.export import export
+# from torch.export import export
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 print('torch.cuda.is_available():', torch.cuda.is_available())
 torch.manual_seed(42)
 
-# torch.set_float32_matmul_precision('medium')
+torch.set_float32_matmul_precision('medium')
+torch.backends.cudnn.benchmark = True
 
 
 def single_profile(args, model):    
@@ -25,6 +26,12 @@ def single_profile(args, model):
     print(f"Model parameters: {num_params}, {memory_size} MB")
     input_memory = sum(i.numel() * 4 / 1024**2 for i in inputs if hasattr(i, "numel"))
     print(f"Input memory: {input_memory} MB")
+    
+    if args.rockmate:
+        # from rockmate import PureRockmate
+        # model = PureRockmate(model, inputs, 32*1024**3)
+        import model_opt
+        model = model_opt.optimize(model, inputs, node_reordering=False)
         
     if args.is_training:
         model.train()
@@ -32,7 +39,8 @@ def single_profile(args, model):
         model.eval()
     
     # profiler
-    profiler = ModelProfiler(model, device=args.device, is_training=args.is_training)
+    profiler = ModelProfiler(model, device=args.device, is_training=args.is_training,
+                             offloading=args.offload_optimizer)
 
     # TODO: we have to add communication time for comprehensive comparison
     if args.communication_time:
@@ -58,7 +66,7 @@ def single_profile(args, model):
     clean_cuda_cache()
 
     if args.torch_profiling:
-        save_name = 'logs/' + args.model + '/' + args.mode + f'train_{args.is_training}-bz{args.batch_size}-{args.hardware}-bagg_{args.batch_aggregate}-mb_{args.mini_batch}-check_{args.checkpointing}'
+        save_name = 'logs/' + args.model + '/' + args.mode + f'train_{args.is_training}-bz{args.batch_size}-{args.hardware}-bagg_{args.batch_aggregate}-mb_{args.mini_batch}-check_{args.checkpointing}-off_{args.offload_optimizer}'
         overwrite_dir(save_name)
         profiler.torch_profiling(data_loader, save_name, wait=1, warmup=1, active=3)
     
@@ -143,7 +151,7 @@ def check_gradients(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="sam", help="")
+parser.add_argument("--model", type=str, default="cosmoflow", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=32)
@@ -157,9 +165,19 @@ parser.add_argument("--torch_profiling", type=bool, default=False)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
 parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
 parser.add_argument("--batch_cat_aggregate", type=bool, default=False, help="Only useful for climax")
-parser.add_argument("--batch_aggregate", type=bool, default=False)
-parser.add_argument("--mini_batch", type=int, default=2)
-parser.add_argument("--checkpointing", type=bool, default=False)
+parser.add_argument("--batch_aggregate", action="store_true", help="Enable batch aggregation")
+parser.add_argument("--no-batch_aggregate", dest="batch_aggregate", action="store_false", help="Disable batch aggregation")
+parser.set_defaults(batch_aggregate=False)
+parser.add_argument("--mini_batch", type=int, default=8)
+parser.add_argument("--checkpointing", action="store_true", help="Enable checkpointing")
+parser.add_argument("--no-checkpointing", dest="checkpointing", action="store_false", help="Disable checkpointing")
+parser.set_defaults(checkpointing=False)
+parser.add_argument("--offload_optimizer", action="store_true", help="Enable offloading optimizer")
+parser.add_argument("--no-offload_optimizer", dest="offload_optimizer", action="store_false", help="Disable offloading optimizer")
+parser.set_defaults(offload_optimizer=False)
+parser.add_argument("--rockmate", action="store_true", help="Enable rockmate")
+parser.add_argument("--no-rockmate", dest="rockmate", action="store_false", help="Disable rockmate")
+parser.set_defaults(rockmate=True)
 
 args = parser.parse_args()
 
@@ -168,10 +186,12 @@ if args.model == "climax":
     from src.climax import get_model, get_inputs
     batch_sizes = list(range(1, 60, 2))
     args.batch_size = 32
+    args.mini_batch = 8
 elif args.model == "enformer":
     from src.enformer import get_model, get_inputs
     batch_sizes = list(range(1, 12, 1))
     args.batch_size = 2
+    args.mini_batch = 1
 elif args.model == "climode": # seems not suitable for our work because of large portion of cpus computation
     batch_sizes = list(range(2, 100, 4))
     from src.climode import get_model, get_inputs
@@ -179,15 +199,18 @@ elif args.model == "climode": # seems not suitable for our work because of large
 elif args.model == "cosmoflow":
     from src.cosmoflow import get_model, get_inputs
     batch_sizes = list(range(1, 60, 2))
-    args.batch_size = 102
+    args.batch_size = 16
+    args.mini_batch = 16
 elif args.model == "sam":
     from src.sam import get_model, get_inputs
     batch_sizes = list(range(1, 20, 1))
     args.batch_size = 3 # training: 3, inference: 10
+    args.mini_batch = 1
 elif args.model == "simmim":
     from src.simmim import get_model, get_inputs
     batch_sizes = list(range(1, 30, 1))
     args.batch_size = 5
+    args.mini_batch = 1
 else:
     raise ValueError(f"Model {args.model} not supported")
 
@@ -212,6 +235,8 @@ if __name__ == "__main__":
         plot_data_twinx(memory_table, throughput_table, stream_nums, batch_sizes, 
         save_name=save_name, x_axis="batch")
     else:
+        print(f"Running with batch_aggregate={args.batch_aggregate}, checkpointing={args.checkpointing}, offload_optimizer={args.offload_optimizer}")
+        
         model = get_model()
         model.batch_cat_aggregate = args.batch_cat_aggregate
         model.batch_aggregate = args.batch_aggregate

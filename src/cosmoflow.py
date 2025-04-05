@@ -151,8 +151,18 @@ def get_model():
 
 if __name__ == "__main__":
     model = get_model().to("cuda")
-    inputs, _, _ = get_inputs(10)
-    loss = model(inputs[0].to("cuda"), inputs[1].to("cuda"))
-    loss.backward()
+    model.checkpointing = True
+    inputs, _, _ = get_inputs(64)
+    start_event = torch.cuda.Event(enable_timing=True)
+    end_event = torch.cuda.Event(enable_timing=True)
+    time_list = []
+    for i in range(10):
+        start_event.record()    
+        loss = model(inputs[0].to("cuda"), inputs[1].to("cuda"))
+        loss.backward()
+        end_event.record()
+        torch.cuda.synchronize()
+        time_list.append(start_event.elapsed_time(end_event))
+    print(f"Time taken: {sum(time_list) / len(time_list)} ms")
     print(loss)
     print(torch.cuda.max_memory_allocated())

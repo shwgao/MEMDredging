@@ -442,7 +442,13 @@ class RunProfileData:
             self.last_step_te = max(main_thread_root.children[-1].end_time, main_thread_root.children[-2].end_time)
         else:
             # raise error
-            raise ValueError("Last step is not a profiler step")
+            # raise ValueError("Last step is not a profiler step")
+            # find the last module node in main thread
+            module_idxs = [i for i, child in enumerate(main_thread_root.children) if isinstance(child, ModuleNode)]
+            profiler_idxs = [i for i, child in enumerate(main_thread_root.children) if isinstance(child, ProfilerStepNode)]
+            
+            self.last_step_ts = min(main_thread_root.children[module_idxs[-1]].start_time, main_thread_root.children[profiler_idxs[-1]].start_time)
+            self.last_step_te = max(main_thread_root.children[module_idxs[-1]].end_time, main_thread_root.children[profiler_idxs[-1]].end_time)
         
         # clean backward tree
         if self.backward_tid is not None:

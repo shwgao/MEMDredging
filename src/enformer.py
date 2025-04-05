@@ -227,12 +227,12 @@ class Enformer(PreTrainedModel):
         x = rearrange(x, 'b n d -> b d n')
         if self.batch_aggregate:
             # split the batch into mini-batches
-            fn = nn.Sequential(self.stem, self.conv_tower[0], self.conv_tower[1])
+            # fn = nn.Sequential(self.stem, self.conv_tower[0], self.conv_tower[1])
+            fn = nn.Sequential(self.stem, *self.conv_tower)
             x = micro_batch(x, fn, x.shape[0], self.mini_batch)
-            # x = micro_batch(x, self.stem, x.shape[0], self.mini_batch)
-            # x = micro_batch(x, self.conv_tower[0], x.shape[0], self.mini_batch)
-            for i in range(2, len(self.conv_tower)):
-                x = self.conv_tower[i](x)
+
+            # for i in range(2, len(self.conv_tower)):
+            #     x = self.conv_tower[i](x)
         else:
             if self.checkpointing:
                 x = checkpoint_sequential(self.stem, len(self.stem), x, use_reentrant=True)
@@ -242,6 +242,7 @@ class Enformer(PreTrainedModel):
                 x = self.conv_tower(x)
         x = rearrange(x, 'b d n -> b n d')
         if self.checkpointing:
+        # if False:
             x = checkpoint_sequential(self.transformer, len(self.transformer), x, use_reentrant=True)
         else:
             x = self.transformer(x)

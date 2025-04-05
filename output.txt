@@ -1,0 +1,58 @@
+Testing model: climax
+===================
+Config 1: batch_aggregate=false, checkpointing=false, offload_optimizer=false
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=False, offload_optimizer=False
+Model parameters: 108088512, 412.324951171875 MB
+Input memory: 13.2501220703125 MB
+Allocated memory: 0.4156 GB
+Allocated memory: 0.4156 GB
+Mean time/batch:    1.960         seconds
+Time  Std:          0.005         seconds
+Memory usage:       25.37          GB
+Memory std:         0             GB
+Throughput:         16.32(16.26~16.41) samples/second
+
+Config 2: batch_aggregate=false, checkpointing=false, offload_optimizer=true
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=False, offload_optimizer=True
+Model parameters: 108088512, 412.324951171875 MB
+Input memory: 13.2501220703125 MB
+Allocated memory: 0.4156 GB
+Allocated memory: 0.4156 GB
+Mean time/batch:    1.993         seconds
+Time  Std:          0.006         seconds
+Memory usage:       24.57          GB
+Memory std:         0             GB
+Throughput:         16.06(15.93~16.12) samples/second
+
+Config 3: batch_aggregate=false, checkpointing=true, offload_optimizer=false
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=True, offload_optimizer=False
+Model parameters: 108088512, 412.324951171875 MB
+Input memory: 13.2501220703125 MB
+Allocated memory: 0.4156 GB
+Allocated memory: 0.4156 GB
+Mean time/batch:    2.186         seconds
+Time  Std:          0.004         seconds
+Memory usage:       25.37          GB
+Memory std:         0             GB
+Throughput:         14.64(14.59~14.68) samples/second
+
+Config 4: batch_aggregate=true, checkpointing=true, offload_optimizer=false
+torch.cuda.is_available(): True
+Running with batch_aggregate=True, checkpointing=True, offload_optimizer=False
+Model parameters: 108088512, 412.324951171875 MB
+Input memory: 13.2501220703125 MB
+Allocated memory: 0.4156 GB
+Allocated memory: 0.4156 GB
+Mean time/batch:    2.242         seconds
+Time  Std:          0.005         seconds
+Memory usage:       15.2          GB
+Memory std:         0             GB
+Throughput:         14.27(14.22~14.33) samples/second
+
+-------------------
+profiling/run.sh: line 37: --checkpointing: command not found
+
+-------------------

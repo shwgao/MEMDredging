@@ -333,11 +333,9 @@ class ClimaX(nn.Module):
             # if self.batch_aggregate:
             #     x = self.batch_aggregate_variables(x, batch_size=self.mini_batch)  # B, L, D
             # else:
-            if self.checkpointing:
-                # x = checkpoint(self.aggregate_variables, x)
-                x = self.aggregate_variables(x)  # B, L, D
-            else:
-                x = self.aggregate_variables(x)  # B, L, D
+            x = self.aggregate_variables(x)  # B, L, D
+            
+            # x = checkpoint(self.batched_cat_aggregate, embeds, var_embed, 32, use_reentrant=True)
         else:
             x = self.batched_cat_aggregate(embeds, var_embed, batch_size=self.mini_batch)  # B, L, D
         

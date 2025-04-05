@@ -6,5 +6,9 @@
     "enformer": {
         "train_path": "./logs/enformer/eagertrain_True-bz2-V100-bagg_False-mb_4-check_False/tensorboard.pt.trace.json/dgx2-2.hpc.engr.oregonstate.edu_3726680.1742342040000112971.pt.trace.json",
         "inference_path": "./logs/enformer/eagertrain_False-bz8-V100-bagg_False-mb_2/dgx2-4.hpc.engr.oregonstate.edu_315437.1740595825699720383.pt.trace.json"
+    },
+    "cosmoflow": {
+        "train_path": "./logs/cosmoflow/eagertrain_True-bz102-V100-bagg_False-mb_8-check_False/tensorboard.pt.trace.json/dgx2-3.hpc.engr.oregonstate.edu_3867797.1743061730500796483.pt.trace.json",
+        "inference_path": "./logs/cosmoflow/eagertrain_False-bz64-V100-bagg_False-mb_2/tensorboard.pt.trace.json/dgx2-1.hpc.engr.oregonstate.edu_3011819.1741128143500444408.pt.trace.json"
     }
 }

@@ -3,6 +3,7 @@ from cst.memory import get_memory_curve
 from cst.profiler.module_op import get_module_tree
 import matplotlib.pyplot as plt
 import json
+import pprint
 
 
 def find_node_by_name(node, name, results): 
@@ -189,7 +190,7 @@ def memory_property_set(root_node, memory_events):
         node.released_span = 0
         for child in node.children:
             set_attributes(child)
-        
+    
     def traverse_tree(node, event):
         if node.start_time <= event.ts and node.end_time >= event.ts:
             node.peak_memory = max(node.peak_memory, event._total_allocated)
@@ -216,35 +217,53 @@ def cost_tree(root_node):
     for node in root_node.children:
         node.cost = node.peak_memory * (node.end_time - node.start_time)
 
-def node_cost_set(root_node, cost_set):
+def node_cost_set(root_node, cost_set, average=0):
     """
     将所有节点添加到 cost_set 中
     """
     cost = (root_node.peak_memory / (root_node.end_time - root_node.start_time)) * (root_node.allocated_span + root_node.released_span) / root_node.sub_nodes_num
-    cost_set[root_node.name] = cost
+    cost = (root_node.peak_memory / root_node.sub_nodes_num) * (root_node.allocated_span + root_node.released_span) 
+    cost = root_node.sub_nodes_num * ((root_node.end_time - root_node.start_time)/1000) / (root_node.allocated_span + root_node.released_span + root_node.peak_memory + average)
+    # cost = ((root_node.end_time - root_node.start_time)/1000) * (root_node.allocated_span - root_node.released_span) / root_node.sub_nodes_num
+    cost = abs(root_node.allocated_span - root_node.released_span) * root_node.sub_nodes_num / (48 + (root_node.end_time - root_node.start_time)/1000)
+    
+    cost_set[root_node.name] = (cost, root_node.peak_memory, root_node.sub_nodes_num, root_node.allocated_span, root_node.released_span, 
+                                (root_node.end_time - root_node.start_time)/1000)
+    
+    
     
     if root_node.children is None:
         return
     
     for child in root_node.children:
-        node_cost_set(child, cost_set)
-                
+        node_cost_set(child, cost_set, average)
+
+
+def average_memory(memory_events):
+    """
+    计算 memory_events 的平均allocated和released
+    """
+    return sum([abs(event.bytes) for event in memory_events]) / len(memory_events) / 1024 / 1024
 
 if __name__ == '__main__':
     # profile_train, module_tree_train = get_profile_from_json(path)
     config = json.load(open('x/cst_config.json'))
     name = 'enformer'
-    path1 = config[name]['inference_path']
+    path1 = config[name]['train_path']
     
     profile_inference, module_tree_inference = get_profile_from_json(path1)
     
     clean_memory_events = profile_inference.clean_memory_events
+    
+    average = average_memory(clean_memory_events)
+    print(f'average_memory: {average}')
+    
     memory_property_set(module_tree_inference[0], clean_memory_events)
     
     cost_set = {}
-    node_cost_set(module_tree_inference[0], cost_set)
+    node_cost_set(module_tree_inference[0], cost_set, average)
     sorted_cost_set = sorted(cost_set.items(), key=lambda x: x[1], reverse=True)
-    print(sorted_cost_set[:10]) # print the top 10
+    pprint.pprint(sorted_cost_set[:20]) # print the top 10
     
     # draw_memory_curve(memory_curve(profile_inference), device='GPU0', name=f'{name}_inference')
     # event_types = hisgramm_event_types(profile_inference)
