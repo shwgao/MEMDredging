@@ -1260,8 +1260,11 @@ class SamModel(SamPreTrainedModel):
         self.shared_image_embedding = SamPositionalEmbedding(config.vision_config)
 
         self.vision_encoder = SamVisionEncoder(config.vision_config)
+        # self.vision_encoder = torch.compile(self.vision_encoder)
         self.prompt_encoder = SamPromptEncoder(config.prompt_encoder_config, self.shared_image_embedding)
+        # self.prompt_encoder = torch.compile(self.prompt_encoder)
         self.mask_decoder = SamMaskDecoder(config.mask_decoder_config)
+        # self.mask_decoder = torch.compile(self.mask_decoder)
 
         self.post_init()
 

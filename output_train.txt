@@ -1,0 +1,117 @@
+Testing model: climax
+===================
+Config 5: batch_aggregate=false, checkpointing=false, offload_optimizer=false, torch_compile=True
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=False, offload_optimizer=False
+Model parameters: 108088512, 412.324951171875 MB
+Input memory: 13.2501220703125 MB
+Allocated memory: 0.4163 GB
+Allocated memory: 0.4163 GB
+Mean time/batch:    1.862         seconds
+Time  Std:          0.005         seconds
+Memory usage:       22.37          GB
+Memory std:         0             GB
+Throughput:         17.19(17.14~17.26) samples/second
+
+-------------------
+Testing model: enformer
+===================
+Config 5: batch_aggregate=false, checkpointing=false, offload_optimizer=false, torch_compile=True
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=False, offload_optimizer=False
+Model parameters: 251221292, 958.3331756591797 MB
+Input memory: 9.60699462890625 MB
+Allocated memory: 0.9501 GB
+Allocated memory: 0.9501 GB
+Mean time/batch:    1.665         seconds
+Time  Std:          0.002         seconds
+Memory usage:       24.34          GB
+Memory std:         0             GB
+Throughput:         1.201(1.197~1.204) samples/second
+
+-------------------
+Testing model: cosmoflow
+===================
+Config 5: batch_aggregate=false, checkpointing=false, offload_optimizer=false, torch_compile=True
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=False, offload_optimizer=False
+Model parameters: 1352588, 5.1597137451171875 MB
+Input memory: 3072.00146484375 MB
+Allocated memory: 3.005 GB
+Allocated memory: 3.005 GB
+Mean time/batch:    0.586         seconds
+Time  Std:          0.000         seconds
+Memory usage:       18.79          GB
+Memory std:         0             GB
+Throughput:         163.8(163.6~163.9) samples/second
+
+-------------------
+Testing model: sam
+===================
+Config 5: batch_aggregate=false, checkpointing=false, offload_optimizer=false, torch_compile=True
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0] Graph break from `Tensor.item()`, consider setting:
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0]     torch._dynamo.config.capture_scalar_outputs = True
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0] or:
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0]     env TORCHDYNAMO_CAPTURE_SCALAR_OUTPUTS=1
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0] to include these operations in the captured graph.
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0] 
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0] Graph break: from user code at:
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0]   File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/sam.py", line 22, in forward
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0]     outputs = self.model(**inputs, multimask_output=False)
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0]   File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/sam_modeling.py", line 1466, in forward
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0]     low_res_masks, iou_predictions, mask_decoder_attentions = self.mask_decoder(
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0]   File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/sam_modeling.py", line 499, in forward
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0]     if sparse_prompt_embeddings.sum().item() != 0:
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0] 
+W0405 14:03:38.532000 529629 site-packages/torch/_dynamo/variables/tensor.py:776] [0/0] 
+W0405 14:04:10.762000 529629 site-packages/torch/fx/experimental/symbolic_shapes.py:5124] [5/0] failed during evaluate_expr(u0, hint=None, size_oblivious=False, forcing_spec=False
+E0405 14:04:10.763000 529629 site-packages/torch/fx/experimental/recording.py:298] [5/0] failed while running evaluate_expr(*(u0, None), **{'fx_node': False})
+W0405 14:04:10.801000 529629 site-packages/torch/fx/experimental/symbolic_shapes.py:5124] [6/0] failed during evaluate_expr(u0, hint=None, size_oblivious=False, forcing_spec=False
+E0405 14:04:10.803000 529629 site-packages/torch/fx/experimental/recording.py:298] [6/0] failed while running evaluate_expr(*(u0, None), **{'fx_node': False})
+W0405 14:04:10.852000 529629 site-packages/torch/fx/experimental/symbolic_shapes.py:5124] [7/0] failed during evaluate_expr(u0, hint=None, size_oblivious=False, forcing_spec=False
+E0405 14:04:10.853000 529629 site-packages/torch/fx/experimental/recording.py:298] [7/0] failed while running evaluate_expr(*(u0, None), **{'fx_node': False})
+W0405 14:04:10.882000 529629 site-packages/torch/fx/experimental/symbolic_shapes.py:5124] [8/0] failed during evaluate_expr(u0, hint=None, size_oblivious=False, forcing_spec=False
+E0405 14:04:10.883000 529629 site-packages/torch/fx/experimental/recording.py:298] [8/0] failed while running evaluate_expr(*(u0, None), **{'fx_node': False})
+W0405 14:04:10.916000 529629 site-packages/torch/_dynamo/exc.py:284] [8/0_1] Backend compiler failed with a fake tensor exception at 
+W0405 14:04:10.916000 529629 site-packages/torch/_dynamo/exc.py:284] [8/0_1]   File "/nfs/hpc/share/gaosho/conda_envs/SAM/lib/python3.12/site-packages/monai/losses/dice.py", line 177, in forward
+W0405 14:04:10.916000 529629 site-packages/torch/_dynamo/exc.py:284] [8/0_1]     intersection = torch.sum(target * input, dim=reduce_axis)
+W0405 14:04:10.916000 529629 site-packages/torch/_dynamo/exc.py:284] [8/0_1] Adding a graph break.
+W0405 14:04:10.946000 529629 site-packages/torch/_dynamo/exc.py:284] [8/0_2] Backend compiler failed with a fake tensor exception at 
+W0405 14:04:10.946000 529629 site-packages/torch/_dynamo/exc.py:284] [8/0_2]   File "/nfs/hpc/share/gaosho/conda_envs/SAM/lib/python3.12/site-packages/monai/losses/dice.py", line 177, in forward
+W0405 14:04:10.946000 529629 site-packages/torch/_dynamo/exc.py:284] [8/0_2]     intersection = torch.sum(target * input, dim=reduce_axis)
+W0405 14:04:10.946000 529629 site-packages/torch/_dynamo/exc.py:284] [8/0_2] Adding a graph break.
+W0405 14:05:10.117000 529629 site-packages/torch/_dynamo/convert_frame.py:844] [3/8] torch._dynamo hit config.cache_size_limit (8)
+W0405 14:05:10.117000 529629 site-packages/torch/_dynamo/convert_frame.py:844] [3/8]    function: 'torch_dynamo_resume_in_forward_at_499' (/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/sam_modeling.py:499)
+W0405 14:05:10.117000 529629 site-packages/torch/_dynamo/convert_frame.py:844] [3/8]    last reason: 3/0: L['___stack0'] == 545.0986938476562                         
+W0405 14:05:10.117000 529629 site-packages/torch/_dynamo/convert_frame.py:844] [3/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+W0405 14:05:10.117000 529629 site-packages/torch/_dynamo/convert_frame.py:844] [3/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=False, offload_optimizer=False
+Model parameters: 93735472, 357.57244873046875 MB
+Input memory: 7.5 MB
+Allocated memory: 0.3917 GB
+Allocated memory: 0.3917 GB
+Mean time/batch:    4.162         seconds
+Time  Std:          3.269         seconds
+Memory usage:       26.84          GB
+Memory std:         0             GB
+Throughput:         0.7209(0.3929~3.385) samples/second
+
+-------------------
+Testing model: simmim
+===================
+Config 5: batch_aggregate=false, checkpointing=false, offload_optimizer=false, torch_compile=True
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=False, offload_optimizer=False
+Model parameters: 49338344, 188.21084594726562 MB
+Input memory: 240.0 MB
+Allocated memory: 0.4183 GB
+Allocated memory: 0.4183 GB
+Mean time/batch:    0.726         seconds
+Time  Std:          0.002         seconds
+Memory usage:       25.87          GB
+Memory std:         0             GB
+Throughput:         6.89(6.865~6.921) samples/second
+
+-------------------
+Testing completed

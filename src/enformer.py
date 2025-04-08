@@ -196,14 +196,14 @@ class Enformer(PreTrainedModel):
 
     def forward(
         self,
-        x,
-        target = None,
+        input_,
         return_corr_coef = False,
         return_embeddings = False,
         return_only_embeddings = False,
         head = 'human',
         target_length = None
     ):
+        x, target = input_
         if isinstance(x, list):
             x = str_to_one_hot(x)
 

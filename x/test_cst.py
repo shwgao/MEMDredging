@@ -66,6 +66,11 @@ def draw_memory_curve(memory_curve, device='GPU0', name=''):
     allocated = [row[1] for row in gpu_data]
     reserved = [row[2] for row in gpu_data]
     
+    # 将数据写入文件
+    with open(f'./logs/{name}_{device}_memory_curve.txt', 'w') as f:
+        for i in range(len(times)):
+            f.write(f'{times[i]},{allocated[i]}\n')
+
     print(times[-1]-times[0])
 
     plt.figure(figsize=(12, 6))
@@ -245,11 +250,12 @@ def average_memory(memory_events):
     """
     return sum([abs(event.bytes) for event in memory_events]) / len(memory_events) / 1024 / 1024
 
+
 if __name__ == '__main__':
     # profile_train, module_tree_train = get_profile_from_json(path)
     config = json.load(open('x/cst_config.json'))
     name = 'enformer'
-    path1 = config[name]['train_path']
+    path1 = config[name]['inference_path']
     
     profile_inference, module_tree_inference = get_profile_from_json(path1)
     
@@ -265,7 +271,7 @@ if __name__ == '__main__':
     sorted_cost_set = sorted(cost_set.items(), key=lambda x: x[1], reverse=True)
     pprint.pprint(sorted_cost_set[:20]) # print the top 10
     
-    # draw_memory_curve(memory_curve(profile_inference), device='GPU0', name=f'{name}_inference')
+    draw_memory_curve(memory_curve(profile_inference), device='GPU0', name=f'{name}_inference')
     # event_types = hisgramm_event_types(profile_inference)
     # draw_histogram(event_types, name)
 

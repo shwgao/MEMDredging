@@ -367,7 +367,7 @@ class ClimaX(nn.Module):
 
     # def forward(self, x, y, lead_times, variables, out_variables, metric, lat):
     # for simplicity, we remove the irrelevant arguments
-    def forward(self, x, lead_times, variables, y, metrics=[lat_weighted_mse]):
+    def forward(self, inputs, metrics=[lat_weighted_mse]):
         """Forward pass through the model.
 
         Args:
@@ -379,6 +379,8 @@ class ClimaX(nn.Module):
             loss (list): Different metrics.
             preds (torch.Tensor): `[B, Vo, H, W]` shape. Predicted weather/climate variables.
         """
+        x, lead_times, variables, y = inputs
+        
         out_transformers = self.forward_encoder(x, lead_times, variables)  # B, L, D
         
         preds = self.head(out_transformers)  # B, L, V*p*p

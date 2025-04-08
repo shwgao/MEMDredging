@@ -7,6 +7,7 @@ import time
 import numpy as np
 from torch.utils.data import DataLoader
 from DaYu.asyncPipelineModel import AsyncPipelineModel
+import torchvision
 # from torch.profiler import ExecutionTraceObserver
 
 
@@ -14,7 +15,7 @@ from DaYu.asyncPipelineModel import AsyncPipelineModel
 
 
 class ModelProfiler:
-    def __init__(self, model=None, save_dir='./logs', device='cuda', is_training=False, offloading=False):
+    def __init__(self, model=None, save_dir='./logs', device='cuda', is_training=False, offloading=False, rockmate=False, input_=None):
         self.model = model
         self.save_dir = save_dir
         self._wrapped_model = None
@@ -23,8 +24,21 @@ class ModelProfiler:
         self.is_training = is_training
         self.optimizer = None
         self.offloading = offloading
+        self.rockmate = rockmate
         
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        self.loss_fn = torch.nn.MSELoss()
+        
+        if rockmate:
+            # from rockmate import PureRockmate
+            # model = PureRockmate(model, inputs, 32*1024**3)
+            import model_opt
+            self.model = model.to(self.device)
+            self.model = model_opt.optimize(self.model, input_, loss_fn=self.loss_fn, optimizer=self.optimizer, node_reordering=True)
+        
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+        # torch.cuda.memory._record_memory_history(True, trace_alloc_max_entries=100000, trace_alloc_record_context=True)
     
     @property
     def wrapped_model(self):
@@ -126,12 +140,12 @@ class ModelProfiler:
             self.optimizer.zero_grad()
         
         # start_event.record()
-        loss = self.model(*data)
+        loss = self.model(data)
         # end_event.record()
         # torch.cuda.synchronize()
         # print(f"Forward time taken: {start_event.elapsed_time(end_event) / 1000.0:.3f} seconds")
         
-        if self.is_training:
+        if self.is_training and not self.rockmate:
             # start_event.record()
             loss.backward()
             self.optimizer.step()
@@ -140,6 +154,33 @@ class ModelProfiler:
             # print(f"Backward time taken: {start_event.elapsed_time(end_event) / 1000.0:.3f} seconds")
         
         return loss
+    
+    def compute_eager_batched_data_rockmate(self, data_loader, start_event, end_event, warmup=1, iter=5):
+        time_list = []
+        memory_list = []
+        for _ in range(3):
+            self._compute(data_loader, start_event, end_event)
+        
+        for _ in range(10):
+            # torch.cuda.reset_peak_memory_stats()
+            start_event.record()
+            
+            sevent = torch.cuda.Event(enable_timing=True)
+            eevent = torch.cuda.Event(enable_timing=True)
+            
+            self._compute(data_loader, sevent, eevent)
+            
+            end_event.record()
+            
+            memory_list.append(torch.cuda.max_memory_allocated() / 1024**3)
+            # memory_list.append(torch.cuda.max_memory_reserved() / 1024**3)
+            # handle = nvmlDeviceGetHandleByIndex(0)
+            # memory_list.append(nvmlDeviceGetMemoryInfo(handle).used / 1024**3)
+            torch.cuda.synchronize()
+            time_list.append(start_event.elapsed_time(end_event) / 1000.0)
+            
+        return time_list, memory_list
+    
     
     def compute_eager_batched_data(self, data_loader, start_event, end_event, warmup=1, iter=5):
         time_list = []

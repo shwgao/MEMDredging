@@ -14,7 +14,8 @@ class ModelWrapper(torch.nn.Module):
     self.mini_batch = 8
     self.checkpointing = False
 
-  def forward(self, inputs, ground_truth_masks):
+  def forward(self, input_):
+    inputs, ground_truth_masks = input_
     self.model.batch_aggregate = self.batch_aggregate
     self.model.mini_batch = self.mini_batch
     self.model.checkpointing = self.checkpointing

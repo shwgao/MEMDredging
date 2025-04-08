@@ -123,25 +123,28 @@ def get_inputs(batch_size):
     return (x, target), [0], True
 
 class ModelWrapper(torch.nn.Module):
-  # warp the loss computing and model forward pass
-  def __init__(self):
-    super().__init__()
-    self.model = CosmoFlow()
-    self.batch_aggregate = False
-    self.mini_batch = 8
-    self.checkpointing = False
+    # warp the loss computing and model forward pass
+    def __init__(self):
+        super().__init__()
+        self.model = CosmoFlow()
+        self.batch_aggregate = False
+        self.mini_batch = 8
+        self.checkpointing = False
     
-  def forward(self, inputs, target):
-    self.model.batch_aggregate = self.batch_aggregate
-    self.model.mini_batch = self.mini_batch
-    self.model.checkpointing = self.checkpointing
-    outputs = self.model(inputs)
-    loss = self.compute_loss(outputs, target)
-    return loss
+    #   def forward(self, inputs, target):
+    def forward(self, input_):
+        inputs, target = input_
+        
+        self.model.batch_aggregate = self.batch_aggregate
+        self.model.mini_batch = self.mini_batch
+        self.model.checkpointing = self.checkpointing
+        outputs = self.model(inputs)
+        loss = self.compute_loss(outputs, target)
+        return loss
   
-  def compute_loss(self, predicted, target):
-    loss = nnf.mse_loss(predicted, target)
-    return loss
+    def compute_loss(self, predicted, target):
+        loss = nnf.mse_loss(predicted, target)
+        return loss
 
 
 def get_model():

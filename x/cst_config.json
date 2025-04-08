@@ -5,10 +5,23 @@
     
     "enformer": {
         "train_path": "./logs/enformer/eagertrain_True-bz2-V100-bagg_False-mb_4-check_False/tensorboard.pt.trace.json/dgx2-2.hpc.engr.oregonstate.edu_3726680.1742342040000112971.pt.trace.json",
-        "inference_path": "./logs/enformer/eagertrain_False-bz8-V100-bagg_False-mb_2/dgx2-4.hpc.engr.oregonstate.edu_315437.1740595825699720383.pt.trace.json"
+        "inference_path": "./logs/enformer/eagertrain_False-bz10-V100-bagg_False-mb_1-check_False-off_False/dgx2-5.hpc.engr.oregonstate.edu_2642785.1744071760915260334.pt.trace.json"
     },
     "cosmoflow": {
         "train_path": "./logs/cosmoflow/eagertrain_True-bz102-V100-bagg_False-mb_8-check_False/tensorboard.pt.trace.json/dgx2-3.hpc.engr.oregonstate.edu_3867797.1743061730500796483.pt.trace.json",
         "inference_path": "./logs/cosmoflow/eagertrain_False-bz64-V100-bagg_False-mb_2/tensorboard.pt.trace.json/dgx2-1.hpc.engr.oregonstate.edu_3011819.1741128143500444408.pt.trace.json"
+    },
+    "enformer_checkpoint": {
+        "train_path": "./logs/enformer/eagertrain_True-bz2-V100-bagg_False-mb_1-check_True-off_False/dgx2-5.hpc.engr.oregonstate.edu_2446091.1743815190749838504.pt.trace.json"
+    },
+    "enformer_original": {
+        "train_path": "./logs/enformer/eagertrain_True-bz2-V100-bagg_False-mb_1-check_False-off_False/dgx2-5.hpc.engr.oregonstate.edu_2719660.1743815587590993066.pt.trace.json"
+    },
+    "enformer_ours": {
+        "train_path": "./logs/enformer/eagertrain_True-bz2-V100-bagg_True-mb_1-check_True/dgx2-5.hpc.engr.oregonstate.edu_2270748.1743814920808369176.pt.trace.json"
+    },
+    "climax": {
+        "train_path": "./logs/climax/eagertrain_True-bz102-V100-bagg_False-mb_8-check_False/tensorboard.pt.trace.json/dgx2-3.hpc.engr.oregonstate.edu_3867797.1743061730500796483.pt.trace.json",
+        "inference_path": "./logs/climax/eagertrain_False-bz32-V100-bagg_True-mb_4/dgx2-4.hpc.engr.oregonstate.edu_175648.1740594503549420636.pt.trace.json"
     }
 }

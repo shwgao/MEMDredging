@@ -36,6 +36,7 @@ class SimMIM(nn.Module):
         self.to_pixels = nn.Linear(encoder_dim, pixel_values_per_patch)
 
     def forward(self, img):
+        img = img[0]
         device = img.device
 
         # get patches
@@ -116,7 +117,7 @@ def get_inputs(batch_size):
     inputs = torch.randn(batch_size, 3, 2048, 2048, dtype=torch.float32)
     batch_index = [0]
     is_batched = True
-    return (inputs,), batch_index, is_batched
+    return (inputs, ), batch_index, is_batched
 
 if __name__ == "__main__":
     import torch

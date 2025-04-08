@@ -1,58 +1,333 @@
 Testing model: climax
 ===================
-Config 1: batch_aggregate=false, checkpointing=false, offload_optimizer=false
+Config 4: batch_aggregate=false, checkpointing=false, offload_optimizer=false, rockmate=true
 torch.cuda.is_available(): True
 Running with batch_aggregate=False, checkpointing=False, offload_optimizer=False
 Model parameters: 108088512, 412.324951171875 MB
-Input memory: 13.2501220703125 MB
-Allocated memory: 0.4156 GB
-Allocated memory: 0.4156 GB
-Mean time/batch:    1.960         seconds
-Time  Std:          0.005         seconds
-Memory usage:       25.37          GB
-Memory std:         0             GB
-Throughput:         16.32(16.26~16.41) samples/second
-
-Config 2: batch_aggregate=false, checkpointing=false, offload_optimizer=true
-torch.cuda.is_available(): True
-Running with batch_aggregate=False, checkpointing=False, offload_optimizer=True
-Model parameters: 108088512, 412.324951171875 MB
-Input memory: 13.2501220703125 MB
-Allocated memory: 0.4156 GB
-Allocated memory: 0.4156 GB
-Mean time/batch:    1.993         seconds
-Time  Std:          0.006         seconds
-Memory usage:       24.57          GB
-Memory std:         0             GB
-Throughput:         16.06(15.93~16.12) samples/second
-
-Config 3: batch_aggregate=false, checkpointing=true, offload_optimizer=false
-torch.cuda.is_available(): True
-Running with batch_aggregate=False, checkpointing=True, offload_optimizer=False
-Model parameters: 108088512, 412.324951171875 MB
-Input memory: 13.2501220703125 MB
-Allocated memory: 0.4156 GB
-Allocated memory: 0.4156 GB
-Mean time/batch:    2.186         seconds
-Time  Std:          0.004         seconds
-Memory usage:       25.37          GB
-Memory std:         0             GB
-Throughput:         14.64(14.59~14.68) samples/second
-
-Config 4: batch_aggregate=true, checkpointing=true, offload_optimizer=false
-torch.cuda.is_available(): True
-Running with batch_aggregate=True, checkpointing=True, offload_optimizer=False
-Model parameters: 108088512, 412.324951171875 MB
-Input memory: 13.2501220703125 MB
-Allocated memory: 0.4156 GB
-Allocated memory: 0.4156 GB
-Mean time/batch:    2.242         seconds
-Time  Std:          0.005         seconds
-Memory usage:       15.2          GB
-Memory std:         0             GB
-Throughput:         14.27(14.22~14.33) samples/second
+Input memory: 9.52352523803711 MB
+Traceback (most recent call last):
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profiling.py", line 253, in <module>
+    single_profile(args, model)
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profiling.py", line 50, in single_profile
+    profiler = ModelProfiler(model, device=args.device, is_training=args.is_training,
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profile_tools2.py", line 37, in __init__
+    self.model = model_opt.optimize(self.model, input_, loss_fn=self.loss_fn, optimizer=self.optimizer, node_reordering=True)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/apis.py", line 22, in optimize
+    ) = importer.import_via_aotautograd(
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/torch/torch_graph_importer.py", line 253, in import_via_aotautograd
+    fx_trace = make_fx(
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 652, in wrapped
+    t = dispatch_trace(wrap_key(func, args, fx_tracer), tracer=fx_tracer, concrete_args=tuple(phs))
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 400, in dispatch_trace
+    graph = tracer.trace(root, concrete_args)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 739, in trace
+    (self.create_arg(fn(*args)),),
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 614, in flatten_fn
+    tree_out = root_fn(*tree_args)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 414, in wrapped
+    out = f(*tensors)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/torch/torch_graph_importer.py", line 227, in fn_model_wrapper
+    out = stateless.functional_call(model, params_and_buffers, args)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/utils/stateless.py", line 156, in functional_call
+    out = module(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 717, in module_call_wrapper
+    return self.call_module(mod, forward, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 366, in call_module
+    return forward(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 710, in forward
+    return _orig_module_call(mod, *args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/climax.py", line 384, in forward
+    out_transformers = self.forward_encoder(x, lead_times, variables)  # B, L, D
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/climax.py", line 323, in forward_encoder
+    embeds.append(self.token_embeds[id](x[:, i : i + 1].contiguous()))  # B, 1, L, D
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/container.py", line 282, in __getitem__
+    return self._modules[self._get_abs_string_index(idx)]
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/container.py", line 270, in _get_abs_string_index
+    idx = operator.index(idx)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/utils/_python_dispatch.py", line 101, in __torch_dispatch__
+    return old.__torch_dispatch__(func, types, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 440, in __torch_dispatch__
+    return self.inner_torch_dispatch(func, types, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 465, in inner_torch_dispatch
+    out = proxy_call(self, func, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 243, in proxy_call
+    raise RuntimeError(
+RuntimeError: It appears that you're trying to get value out of a tracing tensor - erroring out! It's likely that this is caused by data-dependent control flow or similar.
 
 -------------------
-profiling/run.sh: line 37: --checkpointing: command not found
+-------------------
+Testing model: enformer
+===================
+Config 4: batch_aggregate=false, checkpointing=false, offload_optimizer=false, rockmate=true
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=False, offload_optimizer=False
+Model parameters: 251221292, 958.3331756591797 MB
+Input memory: 24.017486572265625 MB
+Traceback (most recent call last):
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profiling.py", line 253, in <module>
+    single_profile(args, model)
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profiling.py", line 50, in single_profile
+    profiler = ModelProfiler(model, device=args.device, is_training=args.is_training,
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profile_tools2.py", line 37, in __init__
+    self.model = model_opt.optimize(self.model, input_, loss_fn=self.loss_fn, optimizer=self.optimizer, node_reordering=True)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/apis.py", line 22, in optimize
+    ) = importer.import_via_aotautograd(
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/torch/torch_graph_importer.py", line 253, in import_via_aotautograd
+    fx_trace = make_fx(
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 652, in wrapped
+    t = dispatch_trace(wrap_key(func, args, fx_tracer), tracer=fx_tracer, concrete_args=tuple(phs))
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 400, in dispatch_trace
+    graph = tracer.trace(root, concrete_args)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 739, in trace
+    (self.create_arg(fn(*args)),),
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 614, in flatten_fn
+    tree_out = root_fn(*tree_args)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 414, in wrapped
+    out = f(*tensors)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/torch/torch_graph_importer.py", line 227, in fn_model_wrapper
+    out = stateless.functional_call(model, params_and_buffers, args)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/utils/stateless.py", line 156, in functional_call
+    out = module(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 717, in module_call_wrapper
+    return self.call_module(mod, forward, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 366, in call_module
+    return forward(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 710, in forward
+    return _orig_module_call(mod, *args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/enformer.py", line 242, in forward
+    x = self.conv_tower(x)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 717, in module_call_wrapper
+    return self.call_module(mod, forward, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 366, in call_module
+    return forward(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 710, in forward
+    return _orig_module_call(mod, *args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/container.py", line 204, in forward
+    input = module(input)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 717, in module_call_wrapper
+    return self.call_module(mod, forward, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 366, in call_module
+    return forward(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 710, in forward
+    return _orig_module_call(mod, *args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/container.py", line 204, in forward
+    input = module(input)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 717, in module_call_wrapper
+    return self.call_module(mod, forward, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 366, in call_module
+    return forward(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 710, in forward
+    return _orig_module_call(mod, *args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/enformer.py", line 482, in forward
+    return self.fn(x, **kwargs) + x
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/utils/_python_dispatch.py", line 101, in __torch_dispatch__
+    return old.__torch_dispatch__(func, types, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 440, in __torch_dispatch__
+    return self.inner_torch_dispatch(func, types, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 465, in inner_torch_dispatch
+    out = proxy_call(self, func, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 304, in proxy_call
+    out = func(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/_ops.py", line 257, in __call__
+    return self._op(*args, **kwargs or {})
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.41 GiB (GPU 0; 31.73 GiB total capacity; 30.51 GiB already allocated; 743.62 MiB free; 30.56 GiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF
 
 -------------------
+-------------------
+Testing model: cosmoflow
+===================
+Config 4: batch_aggregate=false, checkpointing=false, offload_optimizer=false, rockmate=true
+/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/functional.py:1967: UserWarning: nn.functional.sigmoid is deprecated. Use torch.sigmoid instead.
+  warnings.warn("nn.functional.sigmoid is deprecated. Use torch.sigmoid instead.")
+--- Logging error ---
+Traceback (most recent call last):
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/gurobi_utils.py", line 19, in get_gurobi_env
+    int(os.getenv("OLLA_GUROBI_ISV_EXPIRATION")),
+TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/logging/__init__.py", line 1100, in emit
+    msg = self.format(record)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/logging/__init__.py", line 943, in format
+    return fmt.format(record)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/logging/__init__.py", line 678, in format
+    record.message = record.getMessage()
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/logging/__init__.py", line 368, in getMessage
+    msg = msg % self.args
+TypeError: not all arguments converted during string formatting
+Call stack:
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profiling.py", line 253, in <module>
+    single_profile(args, model)
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profiling.py", line 50, in single_profile
+    profiler = ModelProfiler(model, device=args.device, is_training=args.is_training,
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profile_tools2.py", line 37, in __init__
+    self.model = model_opt.optimize(self.model, input_, loss_fn=self.loss_fn, optimizer=self.optimizer, node_reordering=True)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/apis.py", line 45, in optimize
+    summary, schedule, mem_loc = s.ComputeOptimalSchedule(
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/training_graph_optimizer.py", line 338, in ComputeOptimalSchedule
+    solver = ilp_solver.ILPSolver(
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/ilp_solver.py", line 41, in __init__
+    with get_gurobi_env() as env:
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/gurobi_utils.py", line 24, in get_gurobi_env
+    logging.warning(
+Message: 'Failed to create env based on ISV license. If you intended to use'
+Arguments: (' an ISV license, set the OLLA_GUROBI_ISV_NAME', ' OLLA_GUROBI_ISV_APP_NAME, OLLA_GUROBI_ISV_EXPIRATION,', ' and OLLA_GUROBI_ISV_CODE to their corresponding values. Falling back to default Gurobi environment initialization.')
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=False, offload_optimizer=False
+Model parameters: 1352588, 5.1597137451171875 MB
+Input memory: 2048.0009765625 MB
+MODEL STATS: #RAW NODES=82, #RAW EDGES=51
+MODEL STATS: #ACTUAL OPERATORS=34, #ACTUAL TENSORS=33
+Set parameter Username
+Academic license - for non-commercial use only - expires 2025-10-22
+/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/node.py:242: UserWarning: Trying to prepend a node to itself. This behavior has no effect on the graph.
+  warnings.warn("Trying to prepend a node to itself. This behavior has no effect on the graph.")
+Allocated memory: 14.66 GB
+Allocated memory: 14.66 GB
+Mean time/batch:    0.186         seconds
+Time  Std:          0.000         seconds
+Memory usage:       22.7          GB
+Memory std:         0             GB
+Throughput:         343.6(343.3~344.6) samples/second
+
+-------------------
+-------------------
+Testing model: sam
+===================
+Config 4: batch_aggregate=false, checkpointing=false, offload_optimizer=false, rockmate=true
+/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/huggingface_hub/file_download.py:797: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=False, offload_optimizer=False
+Traceback (most recent call last):
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profiling.py", line 246, in <module>
+    model = get_model()
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/sam.py", line 32, in get_model
+    model = ModelWrapper()
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/sam.py", line 12, in __init__
+    self.model = SamModel.from_pretrained("facebook/sam-vit-base")
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/transformers/modeling_utils.py", line 2305, in from_pretrained
+    config, model_kwargs = cls.config_class.from_pretrained(
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/transformers/configuration_utils.py", line 554, in from_pretrained
+    return cls.from_dict(config_dict, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/transformers/configuration_utils.py", line 725, in from_dict
+    logger.info(f"Model config {config}")
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/transformers/configuration_utils.py", line 757, in __repr__
+    return f"{self.__class__.__name__} {self.to_json_string()}"
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/transformers/configuration_utils.py", line 836, in to_json_string
+    return json.dumps(config_dict, indent=2, sort_keys=True) + "\n"
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/json/encoder.py", line 201, in encode
+    chunks = list(chunks)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/json/encoder.py", line 431, in _iterencode
+    yield from _iterencode_dict(o, _current_indent_level)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/json/encoder.py", line 405, in _iterencode_dict
+    yield from chunks
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/json/encoder.py", line 438, in _iterencode
+    o = _default(o)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/json/encoder.py", line 179, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type SamMaskDecoderConfig is not JSON serializable
+
+-------------------
+-------------------
+Testing model: simmim
+===================
+Config 4: batch_aggregate=false, checkpointing=false, offload_optimizer=false, rockmate=true
+torch.cuda.is_available(): True
+Running with batch_aggregate=False, checkpointing=False, offload_optimizer=False
+Model parameters: 49338344, 188.21084594726562 MB
+Input memory: 576.0 MB
+Traceback (most recent call last):
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profiling.py", line 253, in <module>
+    single_profile(args, model)
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profiling.py", line 50, in single_profile
+    profiler = ModelProfiler(model, device=args.device, is_training=args.is_training,
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/profiling/profile_tools2.py", line 37, in __init__
+    self.model = model_opt.optimize(self.model, input_, loss_fn=self.loss_fn, optimizer=self.optimizer, node_reordering=True)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/apis.py", line 22, in optimize
+    ) = importer.import_via_aotautograd(
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/torch/torch_graph_importer.py", line 253, in import_via_aotautograd
+    fx_trace = make_fx(
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 652, in wrapped
+    t = dispatch_trace(wrap_key(func, args, fx_tracer), tracer=fx_tracer, concrete_args=tuple(phs))
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 400, in dispatch_trace
+    graph = tracer.trace(root, concrete_args)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 739, in trace
+    (self.create_arg(fn(*args)),),
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 614, in flatten_fn
+    tree_out = root_fn(*tree_args)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 414, in wrapped
+    out = f(*tensors)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/model_opt/torch/torch_graph_importer.py", line 227, in fn_model_wrapper
+    out = stateless.functional_call(model, params_and_buffers, args)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/utils/stateless.py", line 156, in functional_call
+    out = module(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 717, in module_call_wrapper
+    return self.call_module(mod, forward, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 366, in call_module
+    return forward(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 710, in forward
+    return _orig_module_call(mod, *args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/simmim.py", line 77, in forward
+    encoded = self.encoder.transformer(tokens, self.batch_aggregate, self.mini_batch, self.checkpointing)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 717, in module_call_wrapper
+    return self.call_module(mod, forward, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 366, in call_module
+    return forward(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 710, in forward
+    return _orig_module_call(mod, *args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/vit.py", line 104, in forward
+    x = layer(x)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 717, in module_call_wrapper
+    return self.call_module(mod, forward, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 366, in call_module
+    return forward(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 710, in forward
+    return _orig_module_call(mod, *args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/container.py", line 204, in forward
+    input = module(input)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 717, in module_call_wrapper
+    return self.call_module(mod, forward, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 366, in call_module
+    return forward(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/_symbolic_trace.py", line 710, in forward
+    return _orig_module_call(mod, *args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/nfs/hpc/share/gaosho/projects/mem_proj/MEMDredging/src/vit.py", line 73, in forward
+    dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/utils/_python_dispatch.py", line 101, in __torch_dispatch__
+    return old.__torch_dispatch__(func, types, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 440, in __torch_dispatch__
+    return self.inner_torch_dispatch(func, types, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 465, in inner_torch_dispatch
+    out = proxy_call(self, func, args, kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/fx/experimental/proxy_tensor.py", line 304, in proxy_call
+    out = func(*args, **kwargs)
+  File "/nfs/stak/users/gaosho/.conda/envs/conda_envs/profiling/lib/python3.10/site-packages/torch/_ops.py", line 257, in __call__
+    return self._op(*args, **kwargs or {})
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 6.00 GiB (GPU 0; 31.73 GiB total capacity; 25.22 GiB already allocated; 3.71 GiB free; 27.58 GiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF
+
+-------------------
+-------------------
+Testing completed
