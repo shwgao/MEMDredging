@@ -154,17 +154,17 @@ def check_gradients(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="enformer", help="")
+parser.add_argument("--model", type=str, default="climax", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
-parser.add_argument("--is_training", type=bool, default=False)
+parser.add_argument("--is_training", type=bool, default=True)
 parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
-parser.add_argument("--torch_profiling", type=bool, default=True)
+parser.add_argument("--torch_profiling", type=bool, default=False)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
 parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
 parser.add_argument("--batch_cat_aggregate", type=bool, default=False, help="Only useful for climax")
@@ -191,12 +191,12 @@ args = parser.parse_args()
 if args.model == "climax":
     from src.climax import get_model, get_inputs
     batch_sizes = list(range(1, 60, 2))
-    args.batch_size = 32 if args.is_training else 46
+    args.batch_size = 54#32 if args.is_training else 46
     args.mini_batch = 8
 elif args.model == "enformer":
     from src.enformer import get_model, get_inputs
     batch_sizes = list(range(1, 12, 1))
-    args.batch_size = 2 if args.is_training else 10
+    args.batch_size = 3#2 if args.is_training else 10
     args.mini_batch = 1
 elif args.model == "climode": # seems not suitable for our work because of large portion of cpus computation
     batch_sizes = list(range(2, 100, 4))
@@ -205,18 +205,18 @@ elif args.model == "climode": # seems not suitable for our work because of large
 elif args.model == "cosmoflow":
     from src.cosmoflow import get_model, get_inputs
     batch_sizes = list(range(1, 60, 2))
-    args.batch_size = 96 if args.is_training else 128
+    args.batch_size = 156#96 if args.is_training else 128
     args.mini_batch = 16
 elif args.model == "sam":
     from src.sam import get_model, get_inputs
     batch_sizes = list(range(1, 20, 1))
-    args.batch_size = 3 if args.is_training else 3
+    args.batch_size = 5# 3 if args.is_training else 3
     args.mini_batch = 2
 elif args.model == "simmim":
     from src.simmim import get_model, get_inputs
     batch_sizes = list(range(1, 30, 1))
-    args.batch_size = 5 if args.is_training else 10
-    args.mini_batch = 8
+    args.batch_size = 7#5 if args.is_training else 10
+    args.mini_batch = 2
 else:
     raise ValueError(f"Model {args.model} not supported")
 
@@ -230,10 +230,13 @@ if __name__ == "__main__":
         from utils import read_from_file, plot_data_twinx
 
         model = get_model()
+        model.batch_cat_aggregate = args.batch_cat_aggregate
         model.batch_aggregate = args.batch_aggregate
         model.mini_batch = args.mini_batch
-        # model = torch.compile(model)
-        # results = batch_profile(args, model, batch_sizes, [1])
+        model.checkpointing = args.checkpointing
+        if args.torch_compile:
+            model = torch.compile(model)
+        results = batch_profile(args, model, batch_sizes, [1])
         results = batch_profile_mini_batch(args, model, args.batch_size, [1])
         save_name = f"{args.model}/micro_batch"
         file_name = log_results(results, save_name)

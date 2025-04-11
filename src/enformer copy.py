@@ -201,78 +201,102 @@ class Enformer(PreTrainedModel):
         return_embeddings = False,
         return_only_embeddings = False,
         head = 'human',
-        target_length = None
+        target_length = None,
     ):
-        x, target = input_
-        if isinstance(x, list):
-            x = str_to_one_hot(x)
-
-        elif type(x) == torch.Tensor and x.dtype == torch.long:
-            x = seq_indices_to_one_hot(x)
-        x.to(self.device)
-
-        no_batch = x.ndim == 2
-
-        if no_batch:
-            x = rearrange(x, '... -> () ...')
-
-        if exists(target_length):
-            self.set_target_length(target_length)
-
-        # # original
-        # trunk_fn = self.trunk_checkpointed if self.checkpointing else self._trunk
-        # x = trunk_fn(x)
+        x, target, time_set, memory_set = input_
+        start_time_event = torch.cuda.Event(enable_timing=True)
+        end_time_event = torch.cuda.Event(enable_timing=True)
         
-        # my implementation
-        x = rearrange(x, 'b n d -> b d n')
-        if self.batch_aggregate:
-            # split the batch into mini-batches
-            # fn = nn.Sequential(self.stem, self.conv_tower[0], self.conv_tower[1])
-            fn = nn.Sequential(self.stem, *self.conv_tower)
-            x = micro_batch(x, fn, x.shape[0], self.mini_batch)
+        # start_time_event.record()
+        
+        # if isinstance(x, list):
+        #     x = str_to_one_hot(x)
 
-            # for i in range(2, len(self.conv_tower)):
-            #     x = self.conv_tower[i](x)
-        else:
-            if self.checkpointing:
-                x = checkpoint_sequential(self.stem, len(self.stem), x, use_reentrant=True)
-                x = checkpoint_sequential(self.conv_tower, len(self.conv_tower), x, use_reentrant=True)
-            else:
-                x = self.stem(x)
-                x = self.conv_tower(x)
-        x = rearrange(x, 'b d n -> b n d')
-        if self.checkpointing:
-        # if False:
-            x = checkpoint_sequential(self.transformer, len(self.transformer), x, use_reentrant=True)
-        else:
-            x = self.transformer(x)
+        # elif type(x) == torch.Tensor and x.dtype == torch.long:
+        #     x = seq_indices_to_one_hot(x)
+        # x.to(self.device)
+        
+        # end_time_event.record()
+        # torch.cuda.synchronize()
+        # time_set.append(start_time_event.elapsed_time(end_time_event))
+        # memory_set.append(torch.cuda.max_memory_allocated() / 1024**2)
+
+        # no_batch = x.ndim == 2
+
+        # if no_batch:
+        #     x = rearrange(x, '... -> () ...')
+
+        # if exists(target_length):
+        #     self.set_target_length(target_length)
+
+        # # # original
+        # # trunk_fn = self.trunk_checkpointed if self.checkpointing else self._trunk
+        # # x = trunk_fn(x)
+        
+        # # my implementation
+        # x = rearrange(x, 'b n d -> b d n')
+        
+        # torch.cuda.empty_cache()
+        # torch.cuda.reset_peak_memory_stats()
+        # torch.cuda.synchronize()
+        
+        # start_time_event.record()
+        # x = self.stem(x)
+        # end_time_event.record()
+        # torch.cuda.synchronize()
+        # time_set.append(start_time_event.elapsed_time(end_time_event))
+        # memory_set.append(torch.cuda.max_memory_allocated() / 1024**2)
+        
+        # start_time_event.record()
+        # x = self.conv_tower(x)
+        # end_time_event.record()
+        # torch.cuda.synchronize()
+        # time_set.append(start_time_event.elapsed_time(end_time_event))
+        
+        # start_time_event.record()
+        # x = rearrange(x, 'b d n -> b n d')
+        # end_time_event.record()
+        # torch.cuda.synchronize()
+        # time_set['rearrange_x'].append(start_time_event.elapsed_time(end_time_event))
+        
+        # start_time_event.record()
+        # x = self.transformer(x)
+        # end_time_event.record()
+        # torch.cuda.synchronize()
+        # time_set.append(start_time_event.elapsed_time(end_time_event))
+        
+        start_time_event.record()
         x = self.crop_final(x)
         x = self.final_pointwise(x)
+        end_time_event.record()
+        torch.cuda.synchronize()
+        time_set.append(start_time_event.elapsed_time(end_time_event))
+        
+        # if no_batch:
+        #     x = rearrange(x, '() ... -> ...')
 
-        if no_batch:
-            x = rearrange(x, '() ... -> ...')
+        # if return_only_embeddings:
+        #     return x
 
-        if return_only_embeddings:
-            return x
+        # out = map_values(lambda fn: fn(x), self._heads)
 
-        out = map_values(lambda fn: fn(x), self._heads)
+        # if exists(head):
+        #     assert head in self._heads, f'head {head} not found'
+        #     out = out[head]
 
-        if exists(head):
-            assert head in self._heads, f'head {head} not found'
-            out = out[head]
+        # if exists(target):
+        #     assert exists(head), 'head must be passed in if one were to calculate loss directly with targets'
 
-        if exists(target):
-            assert exists(head), 'head must be passed in if one were to calculate loss directly with targets'
+        #     if return_corr_coef:
+        #         return pearson_corr_coef(out, target)
 
-            if return_corr_coef:
-                return pearson_corr_coef(out, target)
+        #     return poisson_loss(out, target)
 
-            return poisson_loss(out, target)
+        # if return_embeddings:
+        #     return out, x
 
-        if return_embeddings:
-            return out, x
-
-        return out
+        # return out
+        memory_set.append(torch.cuda.max_memory_allocated() / 1024**2)
 
 
 def pearson_corr_coef(x, y, dim = 1, reduce_dims = (-1,)):
@@ -749,14 +773,33 @@ def get_inputs(batch_size):
 if __name__ == "__main__":
     model = get_model()
     seq = torch.randint(0, 5, (8, 196_608)).to('cuda') # for ACGTN, in that order (-1 for padding)
+    
     target = torch.randn(8, 200, 5313).to('cuda')
     
     step = 0
     model.to('cuda')
     model.eval()
     
-    time_set = {}
-
+    import pprint
     with torch.no_grad():
-        output = model((seq, target, time_set))
-        print(output)
+        time_set = {}
+        memory_set = {}
+        for batch in range(1, 20):
+            # seq = torch.randint(0, 5, (batch, 196_608)).to('cuda') # for ACGTN, in that order (-1 for padding)
+            seq = torch.randn(batch, 1536, 1536).to('cuda')
+            
+            batch_time = []
+            batch_memory = []   
+            for i in range(20):
+                try:
+                    output = model((seq, target, batch_time, batch_memory))
+                except Exception as e:
+                    print(e)
+            print(output)
+            try:
+                time_set[batch] = sum(batch_time[3:]) / len(batch_time[3:]) / batch
+                memory_set[batch] = sum(batch_memory[3:]) / len(batch_memory[3:])
+            except Exception as e:
+                print(e)
+        pprint.pprint(time_set)
+        pprint.pprint(memory_set)
