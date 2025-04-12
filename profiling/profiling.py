@@ -154,17 +154,17 @@ def check_gradients(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="climax", help="")
+parser.add_argument("--model", type=str, default="simmim", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--batch_num", type=int, default=10)
 parser.add_argument("--communication_time", type=bool, default=False)
 parser.add_argument("--device", type=str, default="cuda:0")
-parser.add_argument("--is_training", type=bool, default=True)
+parser.add_argument("--is_training", type=bool, default=False)
 parser.add_argument("--batch_profile", type=bool, default=False)
 parser.add_argument("--dump_snapshot", type=bool, default=False)
-parser.add_argument("--torch_profiling", type=bool, default=False)
+parser.add_argument("--torch_profiling", type=bool, default=True)
 parser.add_argument("--backend", type=str, default="pytorch", help="pytorch, no_caching, cuda")
 parser.add_argument("--hardware", type=str, default="V100", help="V100, A100")
 parser.add_argument("--batch_cat_aggregate", type=bool, default=False, help="Only useful for climax")
@@ -205,7 +205,7 @@ elif args.model == "climode": # seems not suitable for our work because of large
 elif args.model == "cosmoflow":
     from src.cosmoflow import get_model, get_inputs
     batch_sizes = list(range(1, 60, 2))
-    args.batch_size = 156#96 if args.is_training else 128
+    args.batch_size = 128# 156#96 if args.is_training else 128
     args.mini_batch = 16
 elif args.model == "sam":
     from src.sam import get_model, get_inputs
@@ -215,7 +215,7 @@ elif args.model == "sam":
 elif args.model == "simmim":
     from src.simmim import get_model, get_inputs
     batch_sizes = list(range(1, 30, 1))
-    args.batch_size = 7#5 if args.is_training else 10
+    args.batch_size = 24# 7#5 if args.is_training else 10
     args.mini_batch = 2
 else:
     raise ValueError(f"Model {args.model} not supported")

@@ -4,7 +4,7 @@
     },
     
     "enformer": {
-        "train_path": "./logs/enformer/eagertrain_True-bz2-V100-bagg_False-mb_4-check_False/tensorboard.pt.trace.json/dgx2-2.hpc.engr.oregonstate.edu_3726680.1742342040000112971.pt.trace.json",
+        "train_path": "./logs/enformer/eagertrain_True-bz2-V100-bagg_False-mb_1-check_False-off_False/dgx2-5.hpc.engr.oregonstate.edu_2719660.1743815587590993066.pt.trace.json",
         "inference_path": "./logs/enformer/eagertrain_False-bz10-V100-bagg_False-mb_1-check_False-off_False/dgx2-5.hpc.engr.oregonstate.edu_2642785.1744071760915260334.pt.trace.json"
     },
     "cosmoflow": {
@@ -21,7 +21,15 @@
         "train_path": "./logs/enformer/eagertrain_True-bz2-V100-bagg_True-mb_1-check_True/dgx2-5.hpc.engr.oregonstate.edu_2270748.1743814920808369176.pt.trace.json"
     },
     "climax": {
-        "train_path": "./logs/climax/eagertrain_True-bz102-V100-bagg_False-mb_8-check_False/tensorboard.pt.trace.json/dgx2-3.hpc.engr.oregonstate.edu_3867797.1743061730500796483.pt.trace.json",
-        "inference_path": "./logs/climax/eagertrain_False-bz32-V100-bagg_True-mb_4/dgx2-4.hpc.engr.oregonstate.edu_175648.1740594503549420636.pt.trace.json"
+        "train_path": "./logs/climax/eagertrain_True-bz32-V100-bagg_False-mb_2/dgx2-3.hpc.engr.oregonstate.edu_2709220.1740812525726895513.pt.trace.json",
+        "inference_path": "./logs/climax/eagertrain_False-bz32-V100-bagg_False-mb_4/dgx2-4.hpc.engr.oregonstate.edu_179207.1740594537302098126.pt.trace.json"
+    },
+    "simmim": {
+        "train_path": "./logs/simmim/eagertrain_True-bz5-V100-bagg_False-mb_1-check_False/tensorboard.pt.trace.json/dgx2-4.hpc.engr.oregonstate.edu_3898868.1743059187753796458.pt.trace.json",
+        "inference_path": "./logs/simmim/eagertrain_False-bz24-V100-bagg_False-mb_2-check_False-off_False/dgx2-1.hpc.engr.oregonstate.edu_564078.1744439252968004287.pt.trace.json"
+    },
+    "sam":{
+        "train_path": "./logs/sam/eagertrain_True-bz3-V100-bagg_False-mb_2-check_False/tensorboard.pt.trace.json/dgx2-3.hpc.engr.oregonstate.edu_3890249.1743119372612827316.pt.trace.json",
+        "inference_path": "./logs/sam/eagertrain_False-bz10-V100-bagg_False-mb_4/dgx2-4.hpc.engr.oregonstate.edu_2093971.1740378882262776897.pt.trace.json"
     }
 }
