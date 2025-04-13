@@ -154,7 +154,7 @@ def check_gradients(args, model):
 
 # args initialization
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", type=str, default="sam", help="")
+parser.add_argument("--model", type=str, default="climax", help="")
 parser.add_argument("--mode", type=str, default="eager", help="eager, multistream")
 parser.add_argument("--stream_num", type=int, default=1)
 parser.add_argument("--batch_size", type=int, default=32)
@@ -179,11 +179,11 @@ parser.add_argument("--rockmate", action="store_true", help="Enable rockmate")
 parser.add_argument("--no-rockmate", dest="rockmate", action="store_false", help="Disable rockmate")
 parser.add_argument("--torch_compile", action="store_true", help="Enable torch compile")
 parser.add_argument("--no-torch_compile", dest="torch_compile", action="store_false", help="Disable torch compile")
-parser.set_defaults(batch_aggregate=False)
-parser.set_defaults(checkpointing=False)
+parser.set_defaults(batch_aggregate=True)
+parser.set_defaults(checkpointing=True)
 parser.set_defaults(offload_optimizer=False)
 parser.set_defaults(rockmate=False)
-parser.set_defaults(torch_compile=True)
+parser.set_defaults(torch_compile=False)
 
 args = parser.parse_args()
 
@@ -191,7 +191,7 @@ args = parser.parse_args()
 if args.model == "climax":
     from src.climax import get_model, get_inputs
     batch_sizes = list(range(1, 60, 2))
-    args.batch_size = 54#32 if args.is_training else 46
+    args.batch_size = 50#32 if args.is_training else 46
     args.mini_batch = 8
 elif args.model == "enformer":
     from src.enformer import get_model, get_inputs
@@ -215,8 +215,8 @@ elif args.model == "sam":
 elif args.model == "simmim":
     from src.simmim import get_model, get_inputs
     batch_sizes = list(range(1, 30, 1))
-    args.batch_size = 6# 7#5 if args.is_training else 10
-    args.mini_batch = 4
+    args.batch_size = 24# 7#5 if args.is_training else 10
+    args.mini_batch = 2
 else:
     raise ValueError(f"Model {args.model} not supported")
 
